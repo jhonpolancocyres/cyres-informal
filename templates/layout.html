@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Cartera</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { margin: 0; padding: 0; display: flex; background-color: #f1f5f9; min-height: 100vh; }
+        #sidebar { width: 70px; background: #0f172a; position: fixed; height: 100vh; z-index: 1000; }
+        
+        #main-content { 
+            flex: 1; 
+            margin-left: 70px; 
+            width: calc(100% - 70px);
+            min-height: 100vh;
+        }
+
+        #sidebar a { color: #64748b; font-size: 1.5rem; display: block; text-align: center; padding: 20px 0; text-decoration: none; border-left: 3px solid transparent; }
+        #sidebar a:hover { color: #f63b3b; }
+        #sidebar a.active { color: white; border-left: 3px solid #f63b3b; }
+
+        body { 
+            font-family: 'Roboto', sans-serif !important; 
+            background-color: #f1f5f9; 
+        }
+
+        #main-content {
+            background-color: #f1f5f9;
+            overflow-x: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <a href="/?vista=cyres" class="{{ 'active' if vista_actual != 'detalle_analisis' and vista_actual != 'upload' and vista_actual != 'usuarios' }}" title="Dashboard">
+            <i class="bi bi-pie-chart-fill"></i>
+        </a>
+        
+        <a href="/?vista=detalle_analisis" class="{{ 'active' if vista_actual == 'detalle_analisis' }}" title="Presupuesto">
+            <i class="bi bi-journal-text"></i>
+        </a>
+
+        <a href="/upload" class="{{ 'active' if vista_actual == 'upload' }}" title="Cargar Archivos">
+            <i class="bi bi-cloud-arrow-up-fill"></i>
+        </a>
+
+        <a href="/usuarios" class="{{ 'active' if vista_actual == 'usuarios' }}" title="Usuarios y Roles">
+            <i class="bi bi-people-fill"></i>
+        </a>
+    </div>
+
+    <div id="main-content">
+        <div class="p-4"> 
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+</body>
+</html>
