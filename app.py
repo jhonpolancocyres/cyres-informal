@@ -253,22 +253,35 @@ def index():
             anio_actual = datetime.now().year
             ultimo_dia = calendar.monthrange(anio_actual, mes_actual)[1]
 
-            # A.1. Leer Presupuesto
+            # A.1. Leer Presupuesto (CORREGIDO)
             path_proyectado = os.path.join(folder_data, 'Proyectadoconsolidado.csv')
             df_filtrado = pd.DataFrame()
             if os.path.exists(path_proyectado):
                 df_proy = pd.read_csv(path_proyectado, sep=';', encoding='latin1')
                 df_proy.columns = df_proy.columns.str.strip()
                 
-                # 1. Limpiamos espacios en blanco en la columna de fecha por si acaso
-                df_proy['Fecha_Vencimiento'] = df_proy['Fecha_Vencimiento'].astype(str).str.strip()
+                # 1. Intentamos leer la fecha sin forzar formato (Pandas detecta YYYY-MM-DD del CSV)
+                df_proy['Fecha_Vencimiento'] = pd.to_datetime(df_proy['Fecha_Vencimiento'], errors='coerce')
                 
-                # 2. Forzamos el formato con puntos que es el que te está dando error
-                df_proy['Fecha_Vencimiento'] = pd.to_datetime(df_proy['Fecha_Vencimiento'], format='%d.%m.%Y', errors='coerce')
+                # 2. Si falló (NaT), intentamos el formato con puntos que viene del Maestro
+                if df_proy['Fecha_Vencimiento'].isna().all():
+                    df_proy['Fecha_Vencimiento'] = pd.to_datetime(df_proy['Fecha_Vencimiento'], format='%d.%m.%Y', errors='coerce')
                 
+                # 3. FILTRO: Mes actual, Año actual Y que esté PENDIENTE
+                # Nota: Asegúrate de que anio_actual coincida con el de tus archivos (2026)
                 filtro = (df_proy['Fecha_Vencimiento'].dt.month == mes_actual) & \
                          (df_proy['Fecha_Vencimiento'].dt.year == anio_actual)
-                df_filtrado = df_proy[filtro]
+                
+                df_filtrado = df_proy[filtro].copy()
+
+                def limpiar_monto(serie):
+                    return pd.to_numeric(serie.astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(0)
+                
+                # Cálculo del KPI Presupuesto Total del Mes
+                kpis_calculados['presupuesto'] = pd.to_numeric(df_filtrado['TOTAL CARTERA'], errors='coerce').fillna(0).sum()
+
+                if df_filtrado.empty:
+                    print(f"ADVERTENCIA: No hay datos PENDIENTES para {mes_actual}/{anio_actual}")
 
             # A.2. Leer Ingresos
             path_pagos = os.path.join(folder_data, 'PagosConsolidado.csv')
