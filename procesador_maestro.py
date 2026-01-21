@@ -26,17 +26,18 @@ def obtener_franja_coca(dias):
 
 def procesar_todo():
     ruta_proy = r'C:\Dashboard\data\proyectados'
-    ruta_maestro = r'C:\Dashboard\data\Proyectadoconsolidado.xlsx'
+    ruta_maestro = r'C:\Dashboard\data\Proyectadoconsolidado.csv'
     hoy = pd.to_datetime(datetime.now().date())
 
     # 1. CONSOLIDACIÓN INICIAL
-    archivos = glob.glob(os.path.join(ruta_proy, "*.xlsx"))
+    archivos = glob.glob(os.path.join(ruta_proy, "*.csv"))
     if not archivos:
         return "No se encontraron archivos para procesar."
 
     lista_df = []
     for archivo in archivos:
-        df_temp = pd.read_excel(archivo)
+        df_temp = pd.read_csv(archivo, sep=';', encoding='latin1')
+        df_temp['Fecha_Vencimiento'] = df_temp['Fecha_Vencimiento'].astype(str).str.strip()
         # COL 1: ID_S (Generado para cada registro en cada archivo)
         df_temp['ID_S'] = (df_temp['COD. CLIENTE'].astype(str) + df_temp['Referencia'].astype(str) + 
                            df_temp['FECHA DOC'].astype(str) + df_temp['Fecha_Vencimiento'].astype(str) + 
@@ -57,7 +58,8 @@ def procesar_todo():
 
     # 3. DETERMINAR ESTADOS (Basado en el ÚLTIMO archivo cargado)
     ultimo_archivo_path = max(archivos, key=os.path.getmtime)
-    df_ultimo = pd.read_excel(ultimo_archivo_path)
+    df_ultimo = pd.read_csv(ultimo_archivo_path, sep=';', encoding='latin1')
+    df_ultimo['Fecha_Vencimiento'] = df_ultimo['Fecha_Vencimiento'].astype(str).str.strip()
     ids_en_ultimo = set((df_ultimo['COD. CLIENTE'].astype(str) + df_ultimo['Referencia'].astype(str) + 
                          df_ultimo['FECHA DOC'].astype(str) + df_ultimo['Fecha_Vencimiento'].astype(str) + 
                          df_ultimo['TOTAL CARTERA'].astype(str)).unique())
@@ -77,7 +79,8 @@ def procesar_todo():
     df_maestro['REVERSO'] = 'NO' 
 
     # COL 6: VTO_DT
-    df_maestro['VTO_DT'] = pd.to_datetime(df_maestro['Fecha_Vencimiento'])
+    df_maestro['Fecha_Vencimiento'] = df_maestro['Fecha_Vencimiento'].astype(str).str.strip()
+    df_maestro['VTO_DT'] = pd.to_datetime(df_maestro['Fecha_Vencimiento'], format='%d.%m.%Y', errors='coerce')
 
     # COL 7: DIAS_MORA
     def calc_mora(row):
@@ -101,7 +104,7 @@ def procesar_todo():
 
     # Limpieza final de columnas técnicas y guardado
     columnas_finales = [col for col in df_maestro.columns if col != 'FECHA_ORIGEN_ARCHIVO']
-    df_maestro[columnas_finales].to_excel(ruta_maestro, index=False)
+    df_maestro[columnas_finales].to_csv(ruta_maestro, index=False, sep=';', encoding='latin1')
     
     return f"Consolidación exitosa. Archivo maestro actualizado con {len(df_maestro)} registros únicos."
 

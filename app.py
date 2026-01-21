@@ -11,9 +11,10 @@ from procesador_maestro import procesar_todo  # Esto importa tu lógica de las 1
 
 app = Flask(__name__)
 
+# --- RUTAS DE ARCHIVOS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RUTA_CARTERA = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.xlsx')
-RUTA_PAGOS = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.xlsx')
+RUTA_CARTERA = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv')
+RUTA_PAGOS = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.csv')
 
 def obtener_fecha_archivo(ruta):
     try:
@@ -32,7 +33,7 @@ def obtener_fecha_archivo(ruta):
 def procesar_informacion(tipo_vista, ciudad_filtro=None):
     try:
         # --- 1. Cargar datos ---
-        df_cartera = pd.read_excel(RUTA_CARTERA, engine='openpyxl')
+        df_cartera = pd.read_csv(RUTA_CARTERA, sep=';', encoding='latin1')
 
         # LIMPIEZA TOTAL DE COLUMNAS
         df_cartera.columns = df_cartera.columns.str.strip()
@@ -85,7 +86,7 @@ def procesar_informacion(tipo_vista, ciudad_filtro=None):
         total_recaudo = 0
         if os.path.exists(RUTA_PAGOS):
             try:
-                df_pagos = pd.read_excel(RUTA_PAGOS, engine='openpyxl')
+                df_pagos = pd.read_csv(RUTA_PAGOS, sep=';', encoding='latin1')
                 df_pagos.columns = df_pagos.columns.str.strip()
                 if 'VALOR PAGADO' in df_pagos.columns:
                     total_recaudo = pd.to_numeric(df_pagos['VALOR PAGADO'], errors='coerce').sum()
@@ -253,25 +254,26 @@ def index():
             ultimo_dia = calendar.monthrange(anio_actual, mes_actual)[1]
 
             # A.1. Leer Presupuesto
-            path_proyectado = os.path.join(folder_data, 'Proyectadoconsolidado.xlsx')
+            path_proyectado = os.path.join(folder_data, 'Proyectadoconsolidado.csv')
             df_filtrado = pd.DataFrame()
-            
             if os.path.exists(path_proyectado):
-                df_proy = pd.read_excel(path_proyectado)
+                df_proy = pd.read_csv(path_proyectado, sep=';', encoding='latin1')
                 df_proy.columns = df_proy.columns.str.strip()
-                df_proy['Fecha_Vencimiento'] = pd.to_datetime(df_proy['Fecha_Vencimiento'], dayfirst=True, errors='coerce')
+                
+                # 1. Limpiamos espacios en blanco en la columna de fecha por si acaso
+                df_proy['Fecha_Vencimiento'] = df_proy['Fecha_Vencimiento'].astype(str).str.strip()
+                
+                # 2. Forzamos el formato con puntos que es el que te está dando error
+                df_proy['Fecha_Vencimiento'] = pd.to_datetime(df_proy['Fecha_Vencimiento'], format='%d.%m.%Y', errors='coerce')
                 
                 filtro = (df_proy['Fecha_Vencimiento'].dt.month == mes_actual) & \
                          (df_proy['Fecha_Vencimiento'].dt.year == anio_actual)
                 df_filtrado = df_proy[filtro]
-                
-                if 'TOTAL CARTERA' in df_filtrado.columns:
-                    kpis_calculados['presupuesto'] = pd.to_numeric(df_filtrado['TOTAL CARTERA'], errors='coerce').fillna(0).sum()
 
             # A.2. Leer Ingresos
-            path_pagos = os.path.join(folder_data, 'PagosConsolidado.xlsx')
+            path_pagos = os.path.join(folder_data, 'PagosConsolidado.csv')
             if os.path.exists(path_pagos):
-                df_pagos = pd.read_excel(path_pagos)
+                df_pagos = pd.read_csv(path_pagos, sep=';', encoding='latin1')
                 df_pagos.columns = df_pagos.columns.str.strip()
                 
                 if 'VALOR PAGADO' in df_pagos.columns:
@@ -328,11 +330,12 @@ def index():
                     presupuesto_ayer = pd.to_numeric(df_filtrado[filtro_ayer]['TOTAL CARTERA'], errors='coerce').fillna(0).sum()
                     kpis_calculados['presupuesto_actual'] = presupuesto_ayer
 
-                    filtro_pagos_ayer = df_pagos['FECHA_PAGO_DT'].dt.day <= dia_ayer
-                    ingresos_ayer = pd.to_numeric(df_pagos[filtro_pagos_ayer]['VALOR PAGADO'], errors='coerce').fillna(0).sum()
-                    kpis_calculados['ingresos_actual'] = ingresos_ayer
-                    kpis_calculados['desviacion_actual'] = ingresos_ayer - presupuesto_ayer
-                    kpis_calculados['ejecucion_actual'] = (ingresos_ayer / presupuesto_ayer * 100) if presupuesto_ayer > 0 else 0
+                    # Reemplazo para asegurar que la caja de abajo siempre se actualice con el total
+                    filtro_hoy = df_filtrado['Fecha_Vencimiento'].dt.day <= dia_hoy
+                    kpis_calculados['ingresos_actual'] = kpis_calculados['ingresos']
+                    kpis_calculados['desviacion_actual'] = kpis_calculados['ingresos'] - kpis_calculados['presupuesto_actual']
+                    kpis_calculados['ejecucion_actual'] = (kpis_calculados['ingresos'] / kpis_calculados['presupuesto_actual'] * 100) if kpis_calculados['presupuesto_actual'] > 0 else 0
+
 
                     # --- CONSOLIDACIÓN POR CLIENTE PARA LA TABLA ---
                     if not df_filtrado.empty:
@@ -366,7 +369,7 @@ def index():
                 kpis_calculados['efectividad'] = (kpis_calculados['ingresos'] / kpis_calculados['presupuesto']) * 100
         
             if os.path.exists(path_proyectado):
-                df_proy = pd.read_excel(path_proyectado)
+                df_proy = pd.read_csv(path_proyectado, sep=';', encoding='latin1')
                 print(f"DEBUG: Columnas encontradas: {df_proy.columns.tolist()}")
                 # ... resto del código ...
                 df_filtrado = df_proy[filtro]
@@ -374,6 +377,10 @@ def index():
         
         except Exception as e:
             print(f"Error en detalle: {e}")
+
+        # FUERZA BRUTA: Justo antes de enviar a la página, igualamos
+        kpis_calculados['ingresos_actual'] = kpis_calculados['ingresos']
+        print(">>> SI VES ESTO, EL CODIGO SI SE ACTUALIZO <<<")
 
         return render_template('detalle.html', 
                                kpis=kpis_calculados, 
@@ -407,7 +414,7 @@ def obtener_ultimo_archivo(ruta_carpeta):
     if not os.path.exists(ruta_carpeta):
         os.makedirs(ruta_carpeta)
     
-    archivos = glob.glob(os.path.join(ruta_carpeta, "*.xlsx"))
+    archivos = glob.glob(os.path.join(ruta_carpeta, "*.csv"))
     if not archivos:
         return "Sin archivos"
     
@@ -495,7 +502,7 @@ def ejecutar_maestro():
                                vista_actual='upload')
 
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
-
-
+if __name__ == '__main__':
+    # Esto permite que Render asigne el puerto automáticamente
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)

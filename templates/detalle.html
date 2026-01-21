@@ -93,71 +93,66 @@
     </style>
 
     <div class="row g-3 mb-4">
-       
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="kpi-box border-azul">
-                    <div class="card-title">Presupuesto Mes</div>
-                    <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.presupuesto | default(0)) }}</div>
-                </div>
+        <div class="col-md-3">
+            <div class="kpi-box border-azul">
+                <div class="card-title">Presupuesto Mes</div>
+                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.presupuesto | default(0)) }}</div>
             </div>
-            <div class="col-md-3">
-                <div class="kpi-box border-verde">
-                    <div class="card-title">Ingresos Confirmados</div>
-                    <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.ingresos | default(0)) }}</div>
-                </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-box border-verde">
+                <div class="card-title">Ingresos Mes</div>
+                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.ingresos | default(0)) }}</div>
             </div>
-            <div class="col-md-3">
-                <div class="kpi-box border-rojo">
-                    <div class="card-title">Desviación Mes</div>
-                    <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.desviacion < 0 else '#1e293b' }};">
-                        $ {{ "{:,.0f}".format(kpis.desviacion | default(0)) }}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-box border-amarillo">
-                    <div class="card-title">Ejecución Mes</div>
-                    <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.efectividad < 80 else '#1e293b' }};">
-                     <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.efectividad < 80 else '#1e293b' }};">
-                        {{ "{:.2f}".format(kpis.efectividad | default(0)) }}%
-                        {% if kpis.efectividad < 80 %}
-                            <i class="bi bi-exclamation-triangle-fill small"></i>
-                        {% endif %}
-                    </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3">
-                <div class="kpi-box border-azul">
-                    <div class="card-title">Presupuesto Actual (-1)</div>
-                    <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.presupuesto_actual | default(0)) }}</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-box border-verde">
-                    <div class="card-title">Ingresos Confirmados</div>
-                    <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.ingresos_actual | default(0)) }}</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-box border-rojo">
-                    <div class="card-title">Desviación Actual</div>
-                    <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.desviacion_actual < 0 else '#1e293b' }};">
-                        $ {{ "{:,.0f}".format(kpis.desviacion_actual | default(0)) }}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-box border-amarillo">
-                    <div class="card-title">Ejecución Actual</div>
-                    <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.ejecucion_actual < 80 else '#1e293b' }};">
-                        {{ "{:.2f}".format(kpis.ejecucion_actual | default(0)) }}%
-                    </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-box border-rojo">
+                <div class="card-title">Desviación Mes</div>
+                <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.desviacion < 0 else '#1e293b' }};">
+                    $ {{ "{:,.0f}".format(kpis.desviacion | default(0)) }}
                 </div>
             </div>
         </div>
+        <div class="col-md-3">
+            <div class="kpi-box border-amarillo">
+                <div class="card-title">Ejecución Mes</div>
+                <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.efectividad < 80 else '#1e293b' }};">
+                    {{ "{:.2f}".format(kpis.efectividad | default(0)) }}%
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="kpi-box border-azul">
+                <div class="card-title">Presupuesto Actual</div>
+                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.presupuesto_actual | default(0)) }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-box border-verde">
+                <div class="card-title">Ingresos Confirmados</div>
+                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.ingresos_actual | default(0)) }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-box border-rojo">
+                <div class="card-title">Desviación Actual</div>
+                <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.desviacion_actual < 0 else '#1e293b' }};">
+                    $ {{ "{:,.0f}".format(kpis.desviacion_actual | default(0)) }}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-box border-amarillo">
+                <div class="card-title">Ejecución Actual</div>
+                <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.ejecucion_actual < 80 else '#1e293b' }};">
+                    {{ "{:.2f}".format(kpis.ejecucion_actual | default(0)) }}%
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="contenedor-tabla-detalle"></div>
        
