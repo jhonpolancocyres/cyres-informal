@@ -11,9 +11,9 @@ from procesador_maestro import procesar_todo  # Esto importa tu lógica de las 1
 
 app = Flask(__name__)
 
-# --- RUTAS DE ARCHIVOS ---
-RUTA_CARTERA = r'C:\Dashboard\data\Proyectadoconsolidado.xlsx'
-RUTA_PAGOS = r'C:\Dashboard\data\PagosConsolidado.xlsx'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RUTA_CARTERA = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.xlsx')
+RUTA_PAGOS = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.xlsx')
 
 def obtener_fecha_archivo(ruta):
     try:
@@ -496,4 +496,5 @@ def ejecutar_maestro():
 
 
 if __name__ == '__main__':
+
     app.run(debug=True)
