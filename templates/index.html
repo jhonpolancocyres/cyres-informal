@@ -343,10 +343,37 @@
         </div>
 
         <div class="row g-3 mb-4">
-            <div class="col"><div class="kpi-box"><div class="small text-muted fw-bold">TOTAL CARTERA</div><div class="h5 fw-bold mb-0">$ {{ "{:,.0f}".format(kpis.total_cartera | default(0)) }}</div></div></div>
-            <div class="col"><div class="kpi-box" style="border-left-color: #ef4444;"><div class="small text-muted fw-bold">VENCIDA</div><div class="h5 fw-bold mb-0">$ {{ "{:,.0f}".format(kpis.vencida | default(0)) }}</div></div></div>
+            <div class="col">
+                <div class="kpi-box">
+                    <div class="small text-muted fw-bold">TOTAL CARTERA</div>
+                    <div class="h5 fw-bold mb-0">
+                        {% set valor_base = kpis.total_cartera | default(0) | float %}
+                        {% set valor_en_millones = valor_base / 1000000 %}
+                        $ {{ "{:,.0f}".format(valor_en_millones) }}M
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="kpi-box" style="border-left-color: #ef4444;">
+                    <div class="small text-muted fw-bold">VENCIDA</div>
+                    <div class="h5 fw-bold mb-0">
+                        {% set valor_vencida = kpis.vencida | default(0) | float %}
+                        {% set vencida_mm = valor_vencida / 1000000 %}
+                        $ {{ "{:,.0f}".format(vencida_mm) }}M
+                    </div>
+                </div>
+            </div>
             <div class="col"><div class="kpi-box" style="border-left-color: #10b981;"><div class="small text-muted fw-bold">MOROSIDAD</div><div class="h5 fw-bold mb-0">{{ "{:.2f}".format(kpis.morosidad | default(0)) }}%</div></div></div>
-            <div class="col"><div class="kpi-box" style="border-left-color: #3d10b9;"><div class="small text-muted fw-bold">RECAUDO</div><div class="h5 fw-bold mb-0">$ {{ "{:,.0f}".format(kpis.recaudo | default(0)) }}</div></div></div>
+            <div class="col">
+                <div class="kpi-box" style="border-left-color: #3d10b9;">
+                    <div class="small text-muted fw-bold">RECAUDO</div>
+                    <div class="h5 fw-bold mb-0">
+                        {% set valor_recaudo = kpis.recaudo | default(0) | float %}
+                        {% set recaudo_mm = valor_recaudo / 1000000 %}
+                        $ {{ "{:,.0f}".format(recaudo_mm) }}M
+                    </div>
+                </div>
+            </div>
             <div class="col"><div class="kpi-box" style="border-left-color: #f59e0b;"><div class="small text-muted fw-bold">CLIENTES</div><div class="h5 fw-bold mb-0">{{ kpis.clientes_total }}</div></div></div>
         </div>
 

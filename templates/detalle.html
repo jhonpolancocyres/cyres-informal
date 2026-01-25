@@ -96,20 +96,30 @@
         <div class="col-md-3">
             <div class="kpi-box border-azul">
                 <div class="card-title">Presupuesto Mes</div>
-                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.presupuesto | default(0)) }}</div>
+                <div class="kpi-value-display">
+                    {% set valor_presu = kpis.presupuesto | default(0) | float %}
+                    {% set presu_mm = valor_presu / 1000000 %}
+                    $ {{ "{:,.0f}".format(presu_mm) }}M
+                </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="kpi-box border-verde">
                 <div class="card-title">Ingresos Mes</div>
-                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.ingresos | default(0)) }}</div>
+                <div class="kpi-value-display">
+                    {% set valor_ingresos = kpis.ingresos | default(0) | float %}
+                    {% set ingresos_mm = valor_ingresos / 1000000 %}
+                    $ {{ "{:,.0f}".format(ingresos_mm) }}M
+                </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="kpi-box border-rojo">
                 <div class="card-title">Desviación Mes</div>
-                <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.desviacion < 0 else '#1e293b' }};">
-                    $ {{ "{:,.0f}".format(kpis.desviacion | default(0)) }}
+                {% set valor_desv = kpis.desviacion | default(0) | float %}
+                {% set desv_mm = valor_desv / 1000000 %}
+                <div class="kpi-value-display" style="color: {{ '#ef4444' if valor_desv < 0 else '#1e293b' }};">
+                    $ {{ "{:,.0f}".format(desv_mm) }}M
                 </div>
             </div>
         </div>
@@ -127,20 +137,30 @@
         <div class="col-md-3">
             <div class="kpi-box border-azul">
                 <div class="card-title">Presupuesto Actual</div>
-                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.presupuesto_actual | default(0)) }}</div>
+                <div class="kpi-value-display">
+                    {% set valor_presu_act = kpis.presupuesto_actual | default(0) | float %}
+                    {% set presu_act_mm = valor_presu_act / 1000000 %}
+                    $ {{ "{:,.0f}".format(presu_act_mm) }}M
+                </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="kpi-box border-verde">
                 <div class="card-title">Ingresos Confirmados</div>
-                <div class="kpi-value-display">$ {{ "{:,.0f}".format(kpis.ingresos_actual | default(0)) }}</div>
+                <div class="kpi-value-display">
+                    {% set valor_ing_act = kpis.ingresos_actual | default(0) | float %}
+                    {% set ing_act_mm = valor_ing_act / 1000000 %}
+                    $ {{ "{:,.0f}".format(ing_act_mm) }}M
+                </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="kpi-box border-rojo">
                 <div class="card-title">Desviación Actual</div>
-                <div class="kpi-value-display" style="color: {{ '#ef4444' if kpis.desviacion_actual < 0 else '#1e293b' }};">
-                    $ {{ "{:,.0f}".format(kpis.desviacion_actual | default(0)) }}
+                {% set valor_desv_act = kpis.desviacion_actual | default(0) | float %}
+                {% set desv_act_mm = valor_desv_act / 1000000 %}
+                <div class="kpi-value-display" style="color: {{ '#ef4444' if valor_desv_act < 0 else '#1e293b' }};">
+                    $ {{ "{:,.0f}".format(desv_act_mm) }}M
                 </div>
             </div>
         </div>
