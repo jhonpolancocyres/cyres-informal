@@ -248,7 +248,7 @@ def index():
     if vista == 'detalle_analisis':
         try:
             
-            folder_data = r'C:\Dashboard\data'
+            folder_data = os.path.join(BASE_DIR, 'data')
             ahora = datetime.now()
             mes_actual = datetime.now().month
             anio_actual = datetime.now().year
@@ -439,8 +439,8 @@ def obtener_ultimo_archivo(ruta_carpeta):
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     mensaje = None
-    RUTA_PROY = r'C:\Dashboard\data\proyectados'
-    RUTA_PAGOS = r'C:\Dashboard\data\pagos_diarios'
+    RUTA_PROY = os.path.join(BASE_DIR, 'data', 'proyectados')
+    RUTA_PAGOS = os.path.join(BASE_DIR, 'data', 'pagos_diarios')
     
     if request.method == 'POST':
         # --- Lógica para Pagos ---
@@ -499,8 +499,8 @@ def ejecutar_maestro():
         resultado = procesar_todo()
         
         # 2. Definir rutas para refrescar la interfaz
-        ruta_p = r'C:\Dashboard\data\proyectados'
-        ruta_pg = r'C:\Dashboard\data\pagos_diarios'
+        ruta_p = os.path.join(BASE_DIR, 'data', 'proyectados')
+        ruta_pg = os.path.join(BASE_DIR, 'data', 'pagos_diarios')
         
         ult_proy = obtener_ultimo_archivo(ruta_p)
         ult_pago = obtener_ultimo_archivo(ruta_pg)
