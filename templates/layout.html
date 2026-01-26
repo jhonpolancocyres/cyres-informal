@@ -34,12 +34,16 @@
 </head>
 <body>
     <div id="sidebar">
-        <a href="/?vista=cyres" class="{{ 'active' if vista_actual != 'detalle_analisis' and vista_actual != 'upload' and vista_actual != 'usuarios' }}" title="Dashboard">
+        <a href="/?vista=cyres" class="{{ 'active' if vista_actual == 'cyres' }}" title="Dashboard">
             <i class="bi bi-pie-chart-fill"></i>
         </a>
         
         <a href="/?vista=detalle_analisis" class="{{ 'active' if vista_actual == 'detalle_analisis' }}" title="Presupuesto">
             <i class="bi bi-journal-text"></i>
+        </a>
+
+        <a href="/gestiones" class="{{ 'active' if vista_actual == 'gestiones' }}" title="Gestión de Analistas">
+            <i class="bi bi-person-check-fill"></i>
         </a>
 
         <a href="/upload" class="{{ 'active' if vista_actual == 'upload' }}" title="Cargar Archivos">

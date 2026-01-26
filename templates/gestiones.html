@@ -1,0 +1,429 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    :root { --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-600: #475569; --slate-900: #0f172a; --blue-600: #2563eb; }
+    .dashboard-container { background-color: var(--slate-50); padding: 1.5rem 2rem; min-height: 100vh; font-family: 'Inter', sans-serif; }
+    .header-metrics { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 2rem; display: flex; align-items: center; gap: 3.5rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .metric-group { display: flex; flex-direction: column; }
+    .metric-label { font-size: 0.7rem; font-weight: 700; color: var(--slate-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .metric-value { font-size: 1.6rem; font-weight: 800; color: var(--slate-900); line-height: 1.1; }
+    .metric-unit { font-size: 0.75rem; color: #94a3b8; font-weight: 400; margin-left: 4px; }
+    .section-spacer { margin-top: 2.5rem; margin-bottom: 1.5rem; }
+    .section-title { font-size: 0.85rem; font-weight: 700; color: var(--slate-600); text-transform: uppercase; letter-spacing: 0.1em; display: flex; align-items: center; margin: 0; }
+    .section-title::after { content: ""; flex: 1; margin-left: 1.5rem; height: 1px; background: #e2e8f0; }
+    .table-container-custom { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; }
+</style>
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">Tablero de Gestión Integral</h3>
+        <span class="badge bg-white text-dark border py-2 px-3 rounded-pill shadow-sm">Corte: {{ now.strftime('%d/%m/%Y %H:%M') }}</span>
+    </div>
+
+    <div class="d-flex mb-4">
+        <a href="{{ url_for('gestiones', vista='general') }}" 
+           class="nav-link rounded-pill px-4 me-2 border {{ 'active bg-primary text-white shadow' if vista_detalle == 'general' else 'bg-light text-dark' }}">
+           Cartera General
+        </a>
+        <a href="{{ url_for('gestiones', vista='analistas') }}" 
+           class="nav-link rounded-pill px-4 border {{ 'active bg-primary text-white shadow' if vista_detalle == 'analistas' else 'bg-light text-dark' }}">
+           Detalle de Analistas
+        </a>
+    </div>
+
+    <div class="container-fluid px-0">
+        
+        {% if vista_detalle == 'general' %}
+            <div id="seccion-general" class="animate__animated animate__fadeIn">
+                <div class="header-metrics mb-4">
+                    <div class="metric-group">
+                        <span class="metric-label">Base de Cartera</span>
+                        <div><span class="metric-value">{{ "{:,.0f}".format(stats.total_clientes) }}</span><span class="metric-unit">Clientes</span></div>
+                    </div>
+                    
+                    <div class="metric-group">
+                        <span class="metric-label">Carga Operativa</span>
+                        <div><span class="metric-value text-secondary">{{ "{:,.0f}".format(stats.total_documentos | default(0)) }}</span><span class="metric-unit">Documentos</span></div>
+                    </div>
+                    <div class="metric-group">
+                        <span class="metric-label">Densidad</span>
+                        <div><span class="metric-value" style="color: var(--blue-600);">{{ stats.promedio_doc }}</span><span class="metric-unit">Doc/Cli</span></div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3"><div class="card border-0 shadow-sm rounded-4 bg-primary text-white p-3 h-100"><div class="small opacity-75 fw-bold text-uppercase">Barrido</div><h2 class="fw-bold mb-1">{{ stats.porc_barrido }}%</h2><div class="small">{{ stats.cant_gestionados }} Gestionados</div></div></div>
+                    <div class="col-md-3"><div class="card border-0 shadow-sm rounded-4 bg-success text-white p-3 h-100"><div class="small opacity-75 fw-bold text-uppercase">Efectividad</div><h2 class="fw-bold mb-1">{{ stats.porc_contactado }}%</h2><div class="small">{{ stats.cant_efectivos }} Efectivos</div></div></div>
+                    <div class="col-md-3"><div class="card border-0 shadow-sm rounded-4 bg-danger text-white p-3 h-100"><div class="small opacity-75 fw-bold text-uppercase">No Efectivos</div><h2 class="fw-bold mb-1">{{ stats.porc_no_contactado }}%</h2><div class="small">Contacto no efectivo</div></div></div>
+                    <div class="col-md-3"><div class="card border-0 shadow-sm rounded-4 bg-secondary text-white p-3 h-100"><div class="small opacity-75 fw-bold text-uppercase">Pendiente</div><h2 class="fw-bold mb-1">{{ stats.porc_sin_gestion }}%</h2><div class="small">{{ stats.cant_sin_gestion }} Sin Tocar</div></div></div>
+                </div>
+
+                <div class="row g-4 mb-5">
+                    <div class="col-md-5">
+                        <div class="table-container-custom h-100">
+                            <div class="p-3 border-bottom bg-white fw-bold">Distribución por Franja</div>
+                            <table class="table table-hover align-middle mb-0" style="font-size: 0.82rem;">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="ps-3">Franja</th>
+                                        <th class="text-center">Total</th>
+                                        <th class="text-center">Gest.</th>
+                                        <th class="text-center">Pend.</th>
+                                        <th class="text-center">Efec.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for f in stats.resumen_franjas %}
+                                    <tr>
+                                        <td class="ps-3 fw-bold">{{ f['Franja Mora Cyres'] }}</td>
+                                        <td class="text-center">{{ f.Total }}</td>
+                                        <td class="text-center text-primary fw-bold">{{ f.Gestionados }}</td>
+                                        <td class="text-center text-danger">{{ f.Sin_Gestion }}</td>
+                                        <td class="text-center text-success fw-bold">{{ f.Efectivo }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <div class="table-container-custom h-100">
+                            <div class="p-3 border-bottom bg-white fw-bold text-primary">Inactividad de Gestión</div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0" style="font-size: 0.72rem;">
+                                    <thead class="bg-light"><tr><th class="ps-3 py-2">Rango</th>{% for col in stats.matriz_antiguedad.columnas %}<th class="text-center">{{ col }}</th>{% endfor %}</tr></thead>
+                                    <tbody>{% for fila in stats.matriz_antiguedad.filas %}<tr class="{% if fila.RANGO_GESTION == 'TOTAL GENERAL' %}bg-dark text-white fw-bold{% endif %}"><td class="ps-3 py-2">{{ fila.RANGO_GESTION }}</td>{% for col in stats.matriz_antiguedad.columnas %}<td class="text-center py-2">{{ "{:,.0f}".format(fila[col]) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container-custom p-3 bg-white">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0">Base de Datos de Gestión</h6>
+                        <div class="d-flex gap-2">
+                            <button id="btnExportarExcel" class="btn btn-success shadow-sm">
+                                <i class="fas fa-file-excel me-2"></i>Exportar
+                            </button>
+                            <select id="f-franja" class="form-select form-select-sm rounded-pill"><option value="">Franja: Todas</option>{% for f in stats.resumen_franjas %}<option value="{{ f['Franja Mora Cyres'] }}">{{ f['Franja Mora Cyres'] }}</option>{% endfor %}</select>
+                            <select id="f-estado" class="form-select form-select-sm rounded-pill"><option value="">Estado: Todos</option><option value="GESTIONADO">GESTIONADOS</option><option value="SIN GESTIÓN">SIN GESTIÓN</option></select>
+                            <select id="f-contacto" class="form-select form-select-sm rounded-pill"><option value="">Contacto: Todos</option><option value="EFECTIVO">EFECTIVOS</option><option value="NO EFECTIVO">NO EFECTIVOS</option></select>
+                        </div>
+                    </div>
+                    <table id="tabla-gestion" class="table table-hover w-100">
+                        <thead><tr class="text-muted small"><th>Código</th><th>Nombre</th><th>Franja</th><th>Estado</th><th>Última Gestión</th><th>Inactividad</th><th>Contacto</th><th class="text-end">Saldo</th></tr></thead>
+                        <tbody>{% for d in stats.detalle_maestro %}<tr><td>{{ d.ID }}</td><td class="fw-bold">{{ d.NOMBRE }}</td><td>{{ d.FRANJA }}</td><td><span class="badge rounded-pill {{ 'bg-success' if d.ESTADO == 'GESTIONADO' else 'bg-light text-dark border' }}">{{ d.ESTADO }}</span></td><td class="text-muted">{{ d.FECHA_ULTIMA }}</td><td>{{ d.RANGO_INACTIVIDAD }}</td><td>{{ d.CONTACTO }}</td><td class="text-end fw-bold">$ {{ "{:,.0f}".format(d.SALDO | float) }}</td></tr>{% endfor %}</tbody>
+                    </table>
+                </div>
+            </div>
+
+        {% elif vista_detalle == 'analistas' %}
+            <div id="seccion-analistas" class="animate__animated animate__fadeIn">
+                <div class="card shadow-sm mb-4 border-start border-primary border-4">
+                    <div class="card-body py-2">
+                        <form method="GET" action="{{ url_for('gestiones') }}" class="row align-items-center">
+                            <input type="hidden" name="vista" value="analistas"> 
+                            <div class="col-auto"><label class="small fw-bold text-primary">FILTRAR POR ANALISTA:</label></div>
+                            <div class="col-md-4">
+                                <select name="analista" class="form-select form-select-sm border-primary shadow-sm" onchange="this.form.submit()">
+                                    <option value="Todos">-- Todo el Equipo --</option>
+                                    {% for ana in stats.resumen_analistas %}
+                                        <option value="{{ ana.USUARIO_GESTION }}" {% if request.args.get('analista') == ana.USUARIO_GESTION %}selected{% endif %}>
+                                            {{ ana.USUARIO_GESTION }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-5">
+                        <div class="table-container-custom h-100 bg-white p-3">
+                            <h6 class="fw-bold text-secondary mb-3 small text-uppercase">Ranking Productividad (Mes)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="bg-light"><tr class="small text-muted"><th>Analista</th><th class="text-center">Utd.</th><th class="text-center">Efec.</th><th class="text-center">%</th></tr></thead>
+                                    <tbody>
+                                        {% for a in stats.resumen_analistas %}
+                                            {% set total_items = stats.resumen_analistas|length %}
+                                            {% set factor = (loop.index0 / (total_items - 1)) if total_items > 1 else 0 %}
+                                            {% set r = (40 + (220 - 40) * factor)|int %}{% set g = (167 + (53 - 167) * factor)|int %}{% set b = (69 + (69 - 69) * factor)|int %}
+                                            {% set color_actual = "rgb(" ~ r ~ "," ~ g ~ "," ~ b ~ ")" %}
+                                        <tr>
+                                            <td class="fw-bold small" style="color: {{ color_actual }};">{{ a.USUARIO_GESTION }}</td>
+                                            <td class="text-center small">{{ a.Clientes_Unicos_Dia }}</td>
+                                            <td class="text-center small fw-bold" style="color: {{ color_actual }};">{{ a.Efectivos }}</td>
+                                            <td class="text-center small fw-bold">{{ a.Efec_Porc }}%</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <div class="table-container-custom h-100 bg-white p-2 d-flex flex-column align-items-center justify-content-center">
+                            <h6 class="fw-bold text-secondary mb-2 small text-uppercase text-center">Calidad</h6>
+                            <div style="height: 120px; width: 100%;">
+                                <canvas id="chartDonaEfectividad"></canvas>
+                            </div>
+                            <div class="mt-2 w-100">
+                                <div class="d-flex justify-content-between x-small" style="font-size: 0.7rem;">
+                                    <span class="text-success fw-bold">EF: {{ stats.dona_efectividad[0] }}</span>
+                                    <span class="text-danger fw-bold">NO: {{ stats.dona_efectividad[1] }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5">
+                        <div class="table-container-custom h-100 bg-white p-3 shadow-sm" style="border-left: 4px solid #3b82f6;">
+                            <h6 class="fw-bold text-primary mb-3 small text-uppercase">Ranking del Día (Hoy)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="bg-light text-primary"><tr class="small"><th>Analista</th><th class="text-center">Cli.</th><th class="text-center">Ges.</th><th class="text-center">Efec.</th><th class="text-center">%</th></tr></thead>
+                                    <tbody>
+                                        {% for r in stats.ranking_dia %}
+                                        <tr>
+                                            <td class="fw-bold small">{{ r.USUARIO_GESTION }}</td>
+                                            <td class="text-center small">{{ r.clientes_gestionados }}</td>
+                                            <td class="text-center small">{{ r.gestiones_realizadas }}</td>
+                                            <td class="text-center small text-success fw-bold">{{ r.efectivos }}</td>
+                                            <td class="text-center"><span class="badge bg-soft-success text-success" style="font-size: 0.7rem;">{{ r.porc_efec }}%</span></td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="5" class="text-center text-muted small py-3">No hay gestiones hoy</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="table-container-custom bg-white p-4">
+                            <h6 class="fw-bold text-secondary mb-4">Tendencia de Gestión y Calidad (Línea de Tiempo)</h6>
+                            <div style="height: 350px; width: 100%;">
+                                <canvas id="chartCombinado"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="table-container-custom bg-white p-4">
+                            <h6 class="fw-bold text-success mb-4 text-uppercase small">Tendencia de Recaudo Diario</h6>
+                            <div style="height: 320px;">
+                                <canvas id="chartRecaudo"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="table-container-custom bg-white p-4 h-100 shadow-sm">
+                            <h6 class="fw-bold text-success mb-4 text-uppercase small">Ranking de Recaudo (%)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle border">
+                                    <thead class="table-light">
+                                        <tr class="small text-uppercase">
+                                            <th>Analista</th>
+                                            <th class="text-end">Monto</th>
+                                            <th class="text-center">% Part.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% set suma_monto = namespace(total=0) %}
+                                        {% for r in stats.recaudo_stats.ranking %}
+                                            {% set suma_monto.total = suma_monto.total + r.Total_Recaudado %}
+                                            <tr>
+                                                <td class="small fw-bold">{{ r.USUARIO_GESTION }}</td>
+                                                <td class="text-end small">${{ "{:,.0f}".format(r.Total_Recaudado) }}</td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-soft-success text-success" style="font-size: 0.75rem;">
+                                                        {{ r.Porc_Part }}%
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-dark">
+                                        <tr class="fw-bold">
+                                            <td class="small">TOTAL</td>
+                                            <td class="text-end small">${{ "{:,.0f}".format(suma_monto.total) }}</td>
+                                            <td class="text-center small">100%</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+    // Función para inicializar todo cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // --- 1. Lógica de DataTables (Requiere jQuery) ---
+        if (typeof jQuery !== 'undefined' && document.getElementById('tabla-gestion')) {
+            var table = $('#tabla-gestion').DataTable({
+                language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
+                dom: 'lrtip', 
+                pageLength: 20, 
+                order: [[7, "desc"]]
+            });
+
+            $('#f-franja').on('change', function() { table.column(2).search(this.value).draw(); });
+            $('#f-estado').on('change', function() { table.column(3).search(this.value).draw(); });
+            $('#f-contacto').on('change', function() {
+            let val = $.fn.dataTable.util.escapeRegex($(this).val());
+            // Esto busca la palabra exacta pero ignora espacios extra
+            table.column(6).search(val ? '^' + val + '$' : '', true, false).draw();
+        });
+    }
+
+        // --- 2. Gráfico de Dona (Calidad) ---
+        const canvasDona = document.getElementById('chartDonaEfectividad');
+        if (canvasDona) {
+            new Chart(canvasDona, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Efectivo', 'No Efectivo'],
+                    datasets: [{
+                        data: {{ stats.dona_efectividad | tojson | safe }},
+                        backgroundColor: ['#10b981', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { cutout: '70%', maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        // --- 3. Gráfico Combinado (Tendencia) ---
+        const canvasComb = document.getElementById('chartCombinado');
+        if (canvasComb) {
+            let chartStatusComb = Chart.getChart("chartCombinado");
+            if (chartStatusComb != undefined) { chartStatusComb.destroy(); }
+
+            new Chart(canvasComb.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: {{ stats.timeline_datos.labels | tojson | safe }},
+                    datasets: [
+                        {
+                            label: 'Clientes Gestionados',
+                            data: {{ stats.timeline_datos.gestionados | tojson | safe }},
+                            backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                            borderColor: '#2563eb',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '% Efectividad',
+                            data: {{ stats.timeline_datos.efectividad | tojson | safe }},
+                            borderColor: '#10b981',
+                            type: 'line',
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Gestiones' } },
+                        y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, title: { display: true, text: '%' } }
+                    }
+                }
+            });
+        }
+
+        // --- 4. Gráfico Recaudo ---
+        const ctxRec = document.getElementById('chartRecaudo');
+        if (ctxRec) {
+            let chartStatusRec = Chart.getChart("chartRecaudo");
+            if (chartStatusRec != undefined) { chartStatusRec.destroy(); }
+
+            new Chart(ctxRec.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: {{ stats.recaudo_stats.labels | tojson | safe }},
+                    datasets: [{
+                        label: 'Recaudo ($)',
+                        data: {{ stats.recaudo_stats.valores | tojson | safe }},
+                        borderColor: '#10b981',
+                        fill: true,
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.3,
+                        pointRadius: 4
+                    }]
+                },
+                options: { 
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Recaudado: $' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { callback: (v) => '$' + v.toLocaleString() } 
+                        }
+                    }
+                }
+            });
+        }
+    }); // <-- ESTA LLAVE Y PARÉNTESIS FALTABAN
+
+        // --- Lógica para Exportar a Excel Corregida ---
+        const btnExportar = document.getElementById('btnExportarExcel');
+        if (btnExportar) {
+            btnExportar.addEventListener('click', function() {
+                // 1. Obtener la tabla por su ID
+                const tabla = document.getElementById('tabla-gestion');
+                if (!tabla) {
+                    alert("Error: No se encontró la tabla 'tabla-gestion'");
+                    return;
+                }
+
+                // 2. Intentar obtener el nombre del analista para el archivo
+                let nombreAnalista = "General";
+                const selector = document.getElementById('filtroAnalista');
+                if (selector && selector.value) {
+                    nombreAnalista = selector.value;
+                }
+
+                // 3. Crear el libro de Excel (SheetJS)
+                const wb = XLSX.utils.table_to_book(tabla, { sheet: "Gestiones" });
+
+                // 4. Generar nombre y descargar
+                const fecha = new Date().toISOString().slice(0, 10);
+                const nombreArchivo = `Reporte_Gestion_${nombreAnalista}_${fecha}.xlsx`;
+                
+                XLSX.writeFile(wb, nombreArchivo);
+            });
+        }
+</script>
+{% endblock %}

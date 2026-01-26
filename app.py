@@ -514,7 +514,30 @@ def ejecutar_maestro():
         return render_template('upload.html', 
                                mensaje=f"❌ Error al procesar: {str(e)}", 
                                vista_actual='upload')
+    
 
+from procesador_gestion import calcular_gestion
+
+@app.route('/gestiones')
+def gestiones():
+    # 1. Definir rutas de archivos
+    path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv')
+    path_gestion = os.path.join(BASE_DIR, 'data', 'gestion.csv')
+    
+    # 2. Capturar variables de la URL
+    vista_activa = request.args.get('vista', 'general') # 'general' o 'analistas'
+    analista_f = request.args.get('analista', 'Todos') # Nombre del analista o 'Todos'
+    
+    # 3. Llamar a la función pasando el filtro
+    # Si la vista es 'general', podrías forzar 'Todos', pero pasar analista_f es más flexible
+    indicadores = calcular_gestion(path_cartera, path_gestion, analista_seleccionado=analista_f)
+    
+    return render_template('gestiones.html',
+                       stats=indicadores,
+                       vista_actual='gestiones',  # <--- Agrega esto para que el Sidebar lo reconozca
+                       vista_detalle=vista_activa,
+                       analista_actual=analista_f,
+                       now=datetime.now())
 
 if __name__ == '__main__':
     # Esto permite que Render asigne el puerto automáticamente
