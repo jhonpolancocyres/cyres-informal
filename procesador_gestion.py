@@ -5,8 +5,8 @@ from datetime import datetime
 def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
     try:
         # 1. Cargar Archivos
-        df_car = pd.read_csv(ruta_cartera, sep=';', encoding='latin1')
-        df_ges = pd.read_csv(ruta_gestion, sep=';', encoding='latin1')
+        df_car = pd.read_csv(ruta_cartera, sep=';', encoding='latin1', compression='zip')
+        df_ges = pd.read_csv(ruta_gestion, sep=';', encoding='latin1', compression='zip')
 
         # 2. Limpiar columnas
         df_car.columns = df_car.columns.str.strip()
@@ -146,8 +146,8 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
 
         # --- LÓGICA DE RECAUDO (REPARADA PARA FILTRAR POR ANALISTA) ---
         try:
-            ruta_pagos = ruta_gestion.replace('gestion.csv', 'PagosConsolidado.csv')
-            df_pagos = pd.read_csv(ruta_pagos, sep=';', encoding='latin1')
+            ruta_pagos = ruta_gestion.replace('gestion.zip', 'PagosConsolidado.zip')
+            df_pagos = pd.read_csv(ruta_pagos, sep=';', encoding='latin1', compression='zip')
             df_pagos.columns = df_pagos.columns.str.strip()
             
             col_pag_id = 'COD. CLIENTE'
