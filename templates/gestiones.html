@@ -105,7 +105,7 @@
 
                 <div class="table-container-custom p-3 bg-white">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="fw-bold mb-0">Base de Datos de Gestión</h6>
+                        <h6 class="fw-bold mb-0">Datos de Gestión</h6>
                         <div class="d-flex gap-2">
                             <button id="btnExportarExcel" class="btn btn-success shadow-sm">
                                 <i class="fas fa-file-excel me-2"></i>Exportar
@@ -281,21 +281,22 @@
         
         // --- 1. Lógica de DataTables (Requiere jQuery) ---
         if (typeof jQuery !== 'undefined' && document.getElementById('tabla-gestion')) {
-            var table = $('#tabla-gestion').DataTable({
-                language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
-                dom: 'lrtip', 
-                pageLength: 20, 
-                order: [[7, "desc"]]
-            });
+        var table = $('#tabla-gestion').DataTable({
+            language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
+            dom: 'rt',            // <--- 'rt' quita el buscador global, el selector de 10/20/50 y la paginación
+            paging: false,        // <--- Desactiva la paginación por completo
+            info: false,          // <--- Quita el texto de "Mostrando X de Y"
+            order: [[7, "desc"]]  // Ordena por Saldo
+        });
 
+            // Mantener los filtros personalizados que ya tienes
             $('#f-franja').on('change', function() { table.column(2).search(this.value).draw(); });
             $('#f-estado').on('change', function() { table.column(3).search(this.value).draw(); });
             $('#f-contacto').on('change', function() {
-            let val = $.fn.dataTable.util.escapeRegex($(this).val());
-            // Esto busca la palabra exacta pero ignora espacios extra
-            table.column(6).search(val ? '^' + val + '$' : '', true, false).draw();
-        });
-    }
+                let val = $.fn.dataTable.util.escapeRegex($(this).val());
+                table.column(6).search(val ? '^' + val + '$' : '', true, false).draw();
+            });
+        }
 
         // --- 2. Gráfico de Dona (Calidad) ---
         const canvasDona = document.getElementById('chartDonaEfectividad');
@@ -395,7 +396,7 @@
                 }
             });
         }
-    }); // <-- ESTA LLAVE Y PARÉNTESIS FALTABAN
+    }); 
 
         // --- Lógica para Exportar a Excel Corregida ---
         const btnExportar = document.getElementById('btnExportarExcel');

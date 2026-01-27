@@ -521,8 +521,8 @@ from procesador_gestion import calcular_gestion
 @app.route('/gestiones')
 def gestiones():
     # 1. Definir rutas de archivos
-    path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv')
-    path_gestion = os.path.join(BASE_DIR, 'data', 'gestion.csv')
+    path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv') # Sigue siendo CSV
+    path_gestion = os.path.join(BASE_DIR, 'data', 'gestion.zip')
     
     # 2. Capturar variables de la URL
     vista_activa = request.args.get('vista', 'general') # 'general' o 'analistas'
