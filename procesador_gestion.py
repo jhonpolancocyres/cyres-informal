@@ -20,7 +20,8 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
         df_ges.columns = df_ges.columns.str.strip()
 
         # CREAMOS LA COPIA MAESTRA ANTES DE FILTRAR PARA EL RANKING
-        df_ges_maestra = df_ges.copy() 
+        df_ges_maestra = df_ges.copy()
+        df_ges_maestra['FECHA_DT'] = pd.to_datetime(df_ges_maestra['FECHA_GESTION'], dayfirst=True, errors='coerce') 
 
         # 3. FILTRO DE ANALISTA (Este ya lo tienes, déjalo igual)
         if analista_seleccionado != 'Todos':
@@ -133,23 +134,34 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
                 'FECHA_ULTIMA': fecha_gest
             })
 
-        # --- RANKING DEL DÍA ---
+        # --- RANKING DEL DÍA (Sustituye tu bloque actual por este) ---
+        hoy_dt = hoy.date()
+        gestiones_hoy = df_ges[df_ges['FECHA_DT'].dt.date == hoy_dt].copy()
+        ranking_dia_final = []
+
+        # --- RANKING DEL DÍA (ORDENADO POR EFECTIVIDAD) ---
         hoy_dt = hoy.date()
         gestiones_hoy = df_ges[df_ges['FECHA_DT'].dt.date == hoy_dt].copy()
         ranking_dia_final = []
 
         if not gestiones_hoy.empty:
             ranking_dia_df = gestiones_hoy.groupby(col_user).agg(
-                clientes_gestionados=(col_ges_id, 'nunique'),
-                gestiones_realizadas=(col_ges_id, 'count')
+                clientes_unicos=(col_ges_id, 'nunique'),
+                gestiones_totales=(col_ges_id, 'count')
             ).reset_index()
+
             efec_hoy = gestiones_hoy[gestiones_hoy['CONTACTO'] == 'EFECTIVO'].groupby(col_user).size()
             ranking_dia_df['efectivos'] = ranking_dia_df[col_user].map(efec_hoy).fillna(0).astype(int)
-            ranking_dia_df['porc_efec'] = ((ranking_dia_df['efectivos'] / ranking_dia_df['gestiones_realizadas']) * 100).round(1).fillna(0)
+            
+            # Cálculo: Efectivos / Gestiones Totales
+            ranking_dia_df['porc_efec'] = ((ranking_dia_df['efectivos'] / ranking_dia_df['gestiones_totales']) * 100).round(1).fillna(0)
+            
             ranking_dia_df = ranking_dia_df[ranking_dia_df[col_user] != 'Jhon Polanco']
-            ranking_dia_final = ranking_dia_df.sort_values('clientes_gestionados', ascending=False).to_dict(orient='records')
 
-        # --- LÓGICA DE RECAUDO ---
+            # --- CAMBIO AQUÍ: Ordenamos por porcentaje de mayor a menor ---
+            ranking_dia_final = ranking_dia_df.sort_values(by='porc_efec', ascending=False).to_dict(orient='records')
+
+        # --- LÓGICA DE RECAUDO MODIFICADA ---
         recaudo_stats_final = {'labels': [], 'valores': [], 'ranking': []}
         try:
             ruta_pagos = ruta_gestion.replace('gestion.zip', 'PagosConsolidado.csv')
@@ -159,16 +171,13 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
                 col_pag_id = 'COD. CLIENTE'
                 df_pagos[col_pag_id] = df_pagos[col_pag_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 
-                # También corregimos fecha en pagos
-                df_pagos['FECHA_PAGO_DT'] = pd.to_datetime(df_pagos['FECHA PAGO'], format='%d/%m/%Y', errors='coerce')
-                if df_pagos['FECHA_PAGO_DT'].isnull().all():
-                    df_pagos['FECHA_PAGO_DT'] = pd.to_datetime(df_pagos['FECHA PAGO'], dayfirst=True, errors='coerce')
-                
+                df_pagos['FECHA_PAGO_DT'] = pd.to_datetime(df_pagos['FECHA PAGO'], dayfirst=True, errors='coerce')
                 df_pagos['FECHA_REF'] = df_pagos['FECHA_PAGO_DT'].dt.strftime('%Y-%m-%d')
                 df_pagos['VALOR_PAGADO'] = pd.to_numeric(df_pagos['VALOR PAGADO'], errors='coerce').fillna(0)
                 df_pagos = df_pagos[df_pagos['VALOR_PAGADO'] > 0].copy()
 
-                df_atrib_base = gestiones_mes.copy() 
+                # --- ATRIBUCIÓN ESTÁTICA (Usa la maestra) ---
+                df_atrib_base = df_ges_maestra.copy() 
                 df_atrib_base[col_ges_id] = df_atrib_base[col_ges_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 df_atrib_base['FECHA_REF'] = df_atrib_base['FECHA_DT'].dt.strftime('%Y-%m-%d')
                 
@@ -179,22 +188,37 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
                 mapa_resp = dict(zip(gest_prio[col_ges_id] + gest_prio['FECHA_REF'], gest_prio[col_user]))
                 df_pagos['ANALISTA_REAL'] = (df_pagos[col_pag_id] + df_pagos['FECHA_REF']).map(mapa_resp).fillna('Sin Gestión')
 
-                total_global = df_pagos['VALOR_PAGADO'].sum()
-                df_time_data = df_pagos[df_pagos['ANALISTA_REAL'] == analista_seleccionado] if analista_seleccionado != 'Todos' else df_pagos
-                df_time_rec = df_time_data.groupby('FECHA_PAGO_DT').agg(monto=('VALOR_PAGADO', 'sum')).reset_index().sort_values('FECHA_PAGO_DT')
-
-                rank_completo = df_pagos.groupby('ANALISTA_REAL').agg(Total_Recaudado=('VALOR_PAGADO', 'sum')).reset_index()
+                # 1. Ranking: Siempre todos los analistas
+                total_global = float(df_pagos['VALOR_PAGADO'].sum())
+                
+                # Agrupamos
+                rank_completo = df_pagos.groupby('ANALISTA_REAL')['VALOR_PAGADO'].sum().reset_index()
                 rank_completo.columns = [col_user, 'Total_Recaudado']
+                
+                # Convertimos a float puro y redondeamos para evitar decimales basura
+                rank_completo['Total_Recaudado'] = rank_completo['Total_Recaudado'].astype(float).round(0)
+                
+                # Filtramos a Jhon Polanco antes de ordenar
+                rank_completo = rank_completo[rank_completo[col_user] != 'Jhon Polanco'].copy()
+                
+                # Porcentaje
                 rank_completo['Porc_Part'] = (rank_completo['Total_Recaudado'] / total_global * 100).round(1) if total_global > 0 else 0
-                rank_completo = rank_completo[rank_completo[col_user] != 'Jhon Polanco']
+                
+                # --- ORDENAMIENTO CRÍTICO ---
+                rank_completo = rank_completo.sort_values(by='Total_Recaudado', ascending=False)
+                # ----------------------------
+
+                # 2. Gráfico
+                df_time_data = df_pagos[df_pagos['ANALISTA_REAL'] == analista_seleccionado] if analista_seleccionado != 'Todos' else df_pagos
+                df_time_rec = df_time_data.groupby('FECHA_PAGO_DT')['VALOR_PAGADO'].sum().reset_index().sort_values('FECHA_PAGO_DT')
 
                 recaudo_stats_final = {
                     'labels': df_time_rec['FECHA_PAGO_DT'].dt.strftime('%d-%m').tolist(),
-                    'valores': df_time_rec['monto'].tolist(),
-                    'ranking': rank_completo.sort_values('Total_Recaudado', ascending=False).to_dict(orient='records')
+                    'valores': df_time_rec['monto'].tolist() if 'monto' in df_time_rec else df_time_rec['VALOR_PAGADO'].tolist(),
+                    'ranking': rank_completo.to_dict(orient='records')
                 }
         except:
-            recaudo_stats_final = {'labels': [], 'valores': [], 'ranking': []}
+            pass # Mantiene el dict vacío inicial si falla algo
 
         return {
             'total_clientes': int(total_clientes), 

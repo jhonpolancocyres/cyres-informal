@@ -215,15 +215,21 @@
                                 <tr>
                                     <td class="text-muted">{{ cli.COD_CLIENTE }}</td>
                                     <td class="fw-bold">{{ cli.RAZON_SOCIAL }}</td>
-                                    <td class="text-end">$ {{ "{:,.0f}".format(cli.Ingresos_Recibidos) }}</td>
-                                    <td class="text-end">$ {{ "{:,.0f}".format(cli.Presupuesto_Actual) }}</td>
-                                    <td class="text-end {{ 'text-success' if cli.Desviacion >= 0 else 'text-danger' }}">
+                                    <td class="text-end" data-order="{{ cli.Ingresos_Recibidos }}">
+                                        $ {{ "{:,.0f}".format(cli.Ingresos_Recibidos) }}
+                                    </td>
+                                    <td class="text-end" data-order="{{ cli.Presupuesto_Actual }}">
+                                        $ {{ "{:,.0f}".format(cli.Presupuesto_Actual) }}
+                                    </td>
+                                    <td class="text-end {{ 'text-success' if cli.Desviacion >= 0 else 'text-danger' }}" data-order="{{ cli.Desviacion }}">
                                         $ {{ "{:,.0f}".format(cli.Desviacion) }}
                                     </td>
                                     <td class="text-center fw-bold {{ 'text-success' if cli.Efe_Actual >= 100 else 'text-danger' if cli.Efe_Actual < 80 else 'text-warning' }}">
                                         {{ "{:.1f}".format(cli.Efe_Actual) }}%
                                     </td>
-                                    <td class="text-end text-muted">$ {{ "{:,.0f}".format(cli.Presupuesto_Mensual) }}</td>
+                                    <td class="text-end text-muted" data-order="{{ cli.Presupuesto_Mensual }}">
+                                        $ {{ "{:,.0f}".format(cli.Presupuesto_Mensual) }}
+                                    </td>
                                     <td class="text-center text-muted fw-bold">{{ "{:.1f}".format(cli.Efe_Mensual) }}%</td>
                                 </tr>
                                 {% endfor %}
@@ -352,18 +358,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- Lógica del DataTable (Se mantiene igual) ---
+    // 1. INICIALIZACIÓN CON CORRECCIÓN DE NÚMEROS
     const table = $('#tablaClientes').DataTable({
-        "pageLength": 20,
-        "language": { "url": "https://cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" }
+    "pageLength": 20,
+    "language": { "url": "https://cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
+    "columnDefs": [
+        // Forzamos a que las columnas de dinero y presupuesto se traten como números puros
+        { "type": "num", "targets": [2, 3, 4, 6] } 
+    ]
     });
 
+    // 2. MANTENER LA ACTUALIZACIÓN DE LA GRÁFICA (CORREGIDO)
     table.on('draw', function () {
         const datosVisibles = table.rows({ filter: 'applied' }).data();
         const registrosTotales = table.rows().count();
 
         let nuevosIngresos;
-        let nuevosPresupuestos; // <-- Variable para el nuevo ppto
+        let nuevosPresupuestos;
 
         if (datosVisibles.length === registrosTotales || datosVisibles.length === 0) {
             nuevosIngresos = [...ingresosOriginales];
@@ -372,31 +383,31 @@ document.addEventListener('DOMContentLoaded', function() {
             nuevosIngresos = new Array(ingresosOriginales.length).fill(0);
             nuevosPresupuestos = new Array(presupuestoOriginal.length).fill(0);
 
-            Array.from(datosVisibles).forEach(fila => {
-                const cod = $(fila[0]).text().trim() || fila[0].toString().trim();
+            // Recorremos los datos filtrados
+            for (let i = 0; i < datosVisibles.length; i++) {
+                let fila = datosVisibles[i];
+                // Extraemos el código limpiando cualquier rastro de HTML
+                let codRaw = fila[0] ? fila[0].toString() : "";
+                let cod = codRaw.replace(/<[^>]*>?/gm, '').trim();
                 
-                // Sumar ingresos (lo que ya tenías)
                 if (historialClientes[cod]) {
-                    historialClientes[cod].forEach((v, i) => { nuevosIngresos[i] += v; });
+                    historialClientes[cod].forEach((v, idx) => { nuevosIngresos[idx] += v; });
                 }
                 
-                // NUEVO: Sumar presupuestos de los clientes filtrados
                 if (historialPresupuesto[cod]) {
-                    historialPresupuesto[cod].forEach((v, i) => { nuevosPresupuestos[i] += v; });
+                    historialPresupuesto[cod].forEach((v, idx) => { nuevosPresupuestos[idx] += v; });
                 }
-            });
+            }
         }
 
         if (window.miGrafica) {
-            // dataset[0] es la línea de Presupuesto (punteada)
             window.miGrafica.data.datasets[0].data = nuevosPresupuestos; 
-            // dataset[1] es la línea de Ingresos (azul)
             window.miGrafica.data.datasets[1].data = nuevosIngresos;
-            
             window.miGrafica.update();
         }
     });
-});
+}); 
+
 </script>
 
 {% endblock %}

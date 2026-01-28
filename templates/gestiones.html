@@ -16,6 +16,21 @@
     .section-title { font-size: 0.85rem; font-weight: 700; color: var(--slate-600); text-transform: uppercase; letter-spacing: 0.1em; display: flex; align-items: center; margin: 0; }
     .section-title::after { content: ""; flex: 1; margin-left: 1.5rem; height: 1px; background: #e2e8f0; }
     .table-container-custom { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; }
+
+    /* Esto iguala la fuente de las tres tablas de ranking */
+    .table-container-custom table {
+        font-size: 0.85rem !important;
+    }
+
+    .table-container-custom thead th {
+        font-size: 0.75rem !important;
+        font-weight: 700;
+    }
+
+    /* Ajuste para las filas de totales */
+    .table-container-custom tfoot td {
+        font-size: 0.85rem !important;
+    }
 </style>
 
 <div class="dashboard-container">
@@ -124,43 +139,59 @@
 
         {% elif vista_detalle == 'analistas' %}
             <div id="seccion-analistas" class="animate__animated animate__fadeIn">
-                <div class="card shadow-sm mb-4 border-start border-primary border-4">
-                    <div class="card-body py-2">
-                        <form method="GET" action="{{ url_for('gestiones') }}" class="row align-items-center">
-                            <input type="hidden" name="vista" value="analistas"> 
-                            <div class="col-auto"><label class="small fw-bold text-primary">FILTRAR POR ANALISTA:</label></div>
-                            <div class="col-md-4">
-                                <select name="analista" class="form-select form-select-sm border-primary shadow-sm" onchange="this.form.submit()">
-                                    <option value="Todos">-- Todo el Equipo --</option>
-                                    {% for ana in stats.resumen_analistas %}
-                                        <option value="{{ ana.USUARIO_GESTION }}" {% if request.args.get('analista') == ana.USUARIO_GESTION %}selected{% endif %}>
-                                            {{ ana.USUARIO_GESTION }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </form>
-                    </div>
+                
+                <div class="card-body py-2 mb-3">
+                    <form method="GET" action="{{ url_for('gestiones') }}" class="row align-items-center">
+                        <input type="hidden" name="vista" value="analistas"> 
+                        <div class="col-auto"><label class="small fw-bold text-primary">FILTRAR POR ANALISTA:</label></div>
+                        <div class="col-md-4">
+                            {# EL FILTRO SIEMPRE MOSTRARA A TODOS PORQUE USA resumen_analistas #}
+                            <select id="filtroan alista" name="analista" class="form-select form-select-sm border-primary shadow-sm" onchange="this.form.submit()">
+                                <option value="Todos">-- Todo el Equipo --</option>
+                                {% for ana in stats.resumen_analistas %}
+                                    <option value="{{ ana.USUARIO_GESTION }}" {% if request.args.get('analista') == ana.USUARIO_GESTION %}selected{% endif %}>
+                                        {{ ana.USUARIO_GESTION }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
                 </div>
 
                 <div class="row g-3 mb-4">
-                    <div class="col-md-5">
-                        <div class="table-container-custom h-100 bg-white p-3">
+                    <div class="col-md-4">
+                        <div class="table-container-custom h-100 bg-white p-3 border-top border-4 border-danger">
                             <h6 class="fw-bold text-secondary mb-3 small text-uppercase">Ranking Productividad (Mes)</h6>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover align-middle">
-                                    <thead class="bg-light"><tr class="small text-muted"><th>Analista</th><th class="text-center">Utd.</th><th class="text-center">Efec.</th><th class="text-center">%</th></tr></thead>
+                            <div class="table-responsive" style="font-size: 0.85rem;">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="bg-light">
+                                        <tr style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            <th>Analista</th>
+                                            <th class="text-center">Gestiones</th>
+                                            <th class="text-center">Efectividad</th>
+                                            <th class="text-center">% Efec.</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
                                         {% for a in stats.resumen_analistas %}
-                                            {% set total_items = stats.resumen_analistas|length %}
-                                            {% set factor = (loop.index0 / (total_items - 1)) if total_items > 1 else 0 %}
-                                            {% set r = (40 + (220 - 40) * factor)|int %}{% set g = (167 + (53 - 167) * factor)|int %}{% set b = (69 + (69 - 69) * factor)|int %}
-                                            {% set color_actual = "rgb(" ~ r ~ "," ~ g ~ "," ~ b ~ ")" %}
                                         <tr>
-                                            <td class="fw-bold small" style="color: {{ color_actual }};">{{ a.USUARIO_GESTION }}</td>
+                                            <td class="fw-bold small">{{ a.USUARIO_GESTION }}</td>
                                             <td class="text-center small">{{ a.Clientes_Unicos_Dia }}</td>
-                                            <td class="text-center small fw-bold" style="color: {{ color_actual }};">{{ a.Efectivos }}</td>
-                                            <td class="text-center small fw-bold">{{ a.Efec_Porc }}%</td>
+                                            <td class="text-center small fw-bold text-primary">{{ a.Efectivos }}</td>
+                                            <td class="text-center">
+                                                {# CAMBIAMOS 'ana' por 'a' PARA QUE COINCIDA CON EL FOR #}
+                                                {% if a.Efec_Porc >= 75 %}
+                                                    {% set color_clase = "bg-success" %}
+                                                {% elif a.Efec_Porc >= 65 %}
+                                                    {% set color_clase = "bg-warning text-dark" %}
+                                                {% else %}
+                                                    {% set color_clase = "bg-danger" %}
+                                                {% endif %}
+
+                                                <span class="badge {{ color_clase }}" style="font-size: 0.75rem; min-width: 50px;">
+                                                    {{ a.Efec_Porc }}%
+                                                </span>
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -169,38 +200,79 @@
                         </div>
                     </div>
 
-                    <div class="col-md-2">
-                        <div class="table-container-custom h-100 bg-white p-2 d-flex flex-column align-items-center justify-content-center">
-                            <h6 class="fw-bold text-secondary mb-2 small text-uppercase text-center">Calidad</h6>
-                            <div style="height: 120px; width: 100%;">
-                                <canvas id="chartDonaEfectividad"></canvas>
-                            </div>
-                            <div class="mt-2 w-100">
-                                <div class="d-flex justify-content-between x-small" style="font-size: 0.7rem;">
-                                    <span class="text-success fw-bold">EF: {{ stats.dona_efectividad[0] }}</span>
-                                    <span class="text-danger fw-bold">NO: {{ stats.dona_efectividad[1] }}</span>
-                                </div>
+                    <div class="col-md-4">
+                        <div class="table-container-custom h-100 bg-white p-3 border-top border-4 border-success">
+                            <h6 class="fw-bold text-success mb-3 small text-uppercase">Ranking de Recaudo (Mes)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="bg-light text-success">
+                                        <tr class="small">
+                                            <th>ANALISTA</th>
+                                            <th class="text-end">MONTO</th>
+                                            <th class="text-center">%PART.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {# 1. Calculamos el total de la columna mientras iteramos #}
+                                        {% set total_monto = [] %}
+                                        
+                                        {% for r in stats.recaudo_stats.ranking %}
+                                            {% if total_monto.append(r.Total_Recaudado) %}{% endif %}
+                                            <tr>
+                                                <td class="small fw-bold">{{ r.USUARIO_GESTION }}</td>
+                                                <td class="text-end small">${{ "{:,.0f}".format(r.Total_Recaudado) }}</td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-soft-success text-success" style="font-size: 0.7rem;">{{ r.Porc_Part }}%</span>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    
+                                    {# 2. Añadimos el pie de tabla con los totales #}
+                                    <tfoot class="bg-light fw-bold border-top">
+                                        <tr>
+                                            <td class="small">TOTAL GENERAL</td>
+                                            <td class="text-end small">
+                                                ${{ "{:,.0f}".format(total_monto | sum) }}
+                                            </td>
+                                            <td class="text-center small">
+                                                <span class="badge bg-success text-white" style="font-size: 0.7rem;">100%</span>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-md-5">
-                        <div class="table-container-custom h-100 bg-white p-3 shadow-sm" style="border-left: 4px solid #3b82f6;">
+                    <div class="col-md-4">
+                        <div class="table-container-custom h-100 bg-white p-3 border-top border-4 border-primary">
                             <h6 class="fw-bold text-primary mb-3 small text-uppercase">Ranking del Día (Hoy)</h6>
                             <div class="table-responsive">
-                                <table class="table table-sm table-hover align-middle">
-                                    <thead class="bg-light text-primary"><tr class="small"><th>Analista</th><th class="text-center">Cli.</th><th class="text-center">Ges.</th><th class="text-center">Efec.</th><th class="text-center">%</th></tr></thead>
-                                    <tbody>
-                                        {% for r in stats.ranking_dia %}
-                                        <tr>
-                                            <td class="fw-bold small">{{ r.USUARIO_GESTION }}</td>
-                                            <td class="text-center small">{{ r.clientes_gestionados }}</td>
-                                            <td class="text-center small">{{ r.gestiones_realizadas }}</td>
-                                            <td class="text-center small text-success fw-bold">{{ r.efectivos }}</td>
-                                            <td class="text-center"><span class="badge bg-soft-success text-success" style="font-size: 0.7rem;">{{ r.porc_efec }}%</span></td>
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="bg-light">
+                                        <tr style="font-size: 0.75rem; text-transform: uppercase;">
+                                            <th>Analista</th>
+                                            <th class="text-center">Clientes</th>
+                                            <th class="text-center">Gestiones</th>
+                                            <th class="text-center">Efec.</th>
+                                            <th class="text-center">%</th>
                                         </tr>
-                                        {% else %}
-                                        <tr><td colspan="5" class="text-center text-muted small py-3">No hay gestiones hoy</td></tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for h in stats.ranking_dia %}
+                                        <tr>
+                                            <td class="fw-bold small">{{ h.USUARIO_GESTION }}</td>
+                                            <td class="text-center small">{{ h.clientes_unicos }}</td>
+                                            <td class="text-center small text-muted" title="Total de intentos">{{ h.gestiones_totales }}</td>
+                                            <td class="text-center small fw-bold text-primary">{{ h.efectivos }}</td>
+                                            <td class="text-center">
+                                                <span class="badge {{ 'bg-success' if h.porc_efec >= 75 else ('bg-warning text-dark' if h.porc_efec >= 65 else 'bg-danger') }}" 
+                                                    style="font-size: 0.75rem; min-width: 50px;">
+                                                    {{ h.porc_efec }}%
+                                                </span>
+                                            </td>
+                                        </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
@@ -220,50 +292,12 @@
                     </div>
                 </div>
 
-                <div class="row g-4">
-                    <div class="col-md-8">
+                <div class="row">
+                    <div class="col-12">
                         <div class="table-container-custom bg-white p-4">
                             <h6 class="fw-bold text-success mb-4 text-uppercase small">Tendencia de Recaudo Diario</h6>
                             <div style="height: 320px;">
                                 <canvas id="chartRecaudo"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="table-container-custom bg-white p-4 h-100 shadow-sm">
-                            <h6 class="fw-bold text-success mb-4 text-uppercase small">Ranking de Recaudo (%)</h6>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover align-middle border">
-                                    <thead class="table-light">
-                                        <tr class="small text-uppercase">
-                                            <th>Analista</th>
-                                            <th class="text-end">Monto</th>
-                                            <th class="text-center">% Part.</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% set suma_monto = namespace(total=0) %}
-                                        {% for r in stats.recaudo_stats.ranking %}
-                                            {% set suma_monto.total = suma_monto.total + r.Total_Recaudado %}
-                                            <tr>
-                                                <td class="small fw-bold">{{ r.USUARIO_GESTION }}</td>
-                                                <td class="text-end small">${{ "{:,.0f}".format(r.Total_Recaudado) }}</td>
-                                                <td class="text-center">
-                                                    <span class="badge bg-soft-success text-success" style="font-size: 0.75rem;">
-                                                        {{ r.Porc_Part }}%
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                    <tfoot class="table-dark">
-                                        <tr class="fw-bold">
-                                            <td class="small">TOTAL</td>
-                                            <td class="text-end small">${{ "{:,.0f}".format(suma_monto.total) }}</td>
-                                            <td class="text-center small">100%</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
                             </div>
                         </div>
                     </div>
@@ -276,20 +310,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
-    // Función para inicializar todo cuando el DOM esté listo
     document.addEventListener('DOMContentLoaded', function() {
-        
-        // --- 1. Lógica de DataTables (Requiere jQuery) ---
         if (typeof jQuery !== 'undefined' && document.getElementById('tabla-gestion')) {
         var table = $('#tabla-gestion').DataTable({
             language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json" },
-            dom: 'rt',            // <--- 'rt' quita el buscador global, el selector de 10/20/50 y la paginación
-            paging: false,        // <--- Desactiva la paginación por completo
-            info: false,          // <--- Quita el texto de "Mostrando X de Y"
-            order: [[7, "desc"]]  // Ordena por Saldo
+            dom: 'rt', paging: false, info: false, order: [[7, "desc"]]
         });
-
-            // Mantener los filtros personalizados que ya tienes
             $('#f-franja').on('change', function() { table.column(2).search(this.value).draw(); });
             $('#f-estado').on('change', function() { table.column(3).search(this.value).draw(); });
             $('#f-contacto').on('change', function() {
@@ -297,134 +323,64 @@
                 table.column(6).search(val ? '^' + val + '$' : '', true, false).draw();
             });
         }
-
-        // --- 2. Gráfico de Dona (Calidad) ---
-        const canvasDona = document.getElementById('chartDonaEfectividad');
-        if (canvasDona) {
-            new Chart(canvasDona, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Efectivo', 'No Efectivo'],
-                    datasets: [{
-                        data: {{ stats.dona_efectividad | tojson | safe }},
-                        backgroundColor: ['#10b981', '#ef4444'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { cutout: '70%', maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-        }
-
-        // --- 3. Gráfico Combinado (Tendencia) ---
+        
         const canvasComb = document.getElementById('chartCombinado');
         if (canvasComb) {
-            let chartStatusComb = Chart.getChart("chartCombinado");
-            if (chartStatusComb != undefined) { chartStatusComb.destroy(); }
-
             new Chart(canvasComb.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: {{ stats.timeline_datos.labels | tojson | safe }},
                     datasets: [
-                        {
-                            label: 'Clientes Gestionados',
-                            data: {{ stats.timeline_datos.gestionados | tojson | safe }},
-                            backgroundColor: 'rgba(37, 99, 235, 0.2)',
-                            borderColor: '#2563eb',
-                            borderWidth: 1,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: '% Efectividad',
-                            data: {{ stats.timeline_datos.efectividad | tojson | safe }},
-                            borderColor: '#10b981',
-                            type: 'line',
-                            tension: 0.4,
-                            yAxisID: 'y1'
-                        }
+                        { label: 'Clientes Gestionados', data: {{ stats.timeline_datos.gestionados | tojson | safe }}, backgroundColor: 'rgba(37, 99, 235, 0.2)', borderColor: '#2563eb', borderWidth: 1, yAxisID: 'y' },
+                        { label: '% Efectividad', data: {{ stats.timeline_datos.efectividad | tojson | safe }}, borderColor: '#10b981', type: 'line', tension: 0.4, yAxisID: 'y1' }
                     ]
                 },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true, title: { display: true, text: 'Gestiones' } },
-                        y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, title: { display: true, text: '%' } }
-                    }
-                }
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true }, y1: { position: 'right', min: 0, max: 100 } } }
             });
         }
 
-        // --- 4. Gráfico Recaudo ---
         const ctxRec = document.getElementById('chartRecaudo');
         if (ctxRec) {
-            let chartStatusRec = Chart.getChart("chartRecaudo");
-            if (chartStatusRec != undefined) { chartStatusRec.destroy(); }
-
             new Chart(ctxRec.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: {{ stats.recaudo_stats.labels | tojson | safe }},
-                    datasets: [{
-                        label: 'Recaudo ($)',
-                        data: {{ stats.recaudo_stats.valores | tojson | safe }},
-                        borderColor: '#10b981',
-                        fill: true,
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        tension: 0.3,
-                        pointRadius: 4
-                    }]
+                    datasets: [{ label: 'Recaudo ($)', data: {{ stats.recaudo_stats.valores | tojson | safe }}, borderColor: '#10b981', fill: true, backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.3 }]
                 },
-                options: { 
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return 'Recaudado: $' + context.parsed.y.toLocaleString();
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { 
-                            beginAtZero: true,
-                            ticks: { callback: (v) => '$' + v.toLocaleString() } 
-                        }
-                    }
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+    });
+
+    const btnExportar = document.getElementById('btnExportarExcel');
+    if (btnExportar) {
+        btnExportar.addEventListener('click', function() {
+            const tabla = document.getElementById('tabla-gestion');
+            const wb = XLSX.utils.table_to_book(tabla, { sheet: "Gestiones" });
+            XLSX.writeFile(wb, `Reporte_Gestion_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        });
+    }
+        document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const seleccionado = urlParams.get('analista');
+
+        if (seleccionado && seleccionado !== 'Todos') {
+            // Buscamos todas las filas de la tabla de Recaudo
+            // Suponiendo que la tabla es la segunda o tiene una clase específica
+            const filas = document.querySelectorAll('table:nth-of-type(2) tbody tr'); 
+            
+            filas.forEach(fila => {
+                const nombreAnalista = fila.cells[0].innerText.trim();
+                if (nombreAnalista === seleccionado) {
+                    fila.style.backgroundColor = '#e7f1ff'; // Resalta el seleccionado
+                    fila.style.display = 'table-row';
+                } else {
+                    // EN LUGAR DE OCULTAR, solo bajamos la opacidad para que sea ESTÁTICA
+                    fila.style.opacity = '0.5'; 
+                    fila.style.display = 'table-row'; // Forzamos que se siga viendo
                 }
             });
         }
-    }); 
-
-        // --- Lógica para Exportar a Excel Corregida ---
-        const btnExportar = document.getElementById('btnExportarExcel');
-        if (btnExportar) {
-            btnExportar.addEventListener('click', function() {
-                // 1. Obtener la tabla por su ID
-                const tabla = document.getElementById('tabla-gestion');
-                if (!tabla) {
-                    alert("Error: No se encontró la tabla 'tabla-gestion'");
-                    return;
-                }
-
-                // 2. Intentar obtener el nombre del analista para el archivo
-                let nombreAnalista = "General";
-                const selector = document.getElementById('filtroAnalista');
-                if (selector && selector.value) {
-                    nombreAnalista = selector.value;
-                }
-
-                // 3. Crear el libro de Excel (SheetJS)
-                const wb = XLSX.utils.table_to_book(tabla, { sheet: "Gestiones" });
-
-                // 4. Generar nombre y descargar
-                const fecha = new Date().toISOString().slice(0, 10);
-                const nombreArchivo = `Reporte_Gestion_${nombreAnalista}_${fecha}.xlsx`;
-                
-                XLSX.writeFile(wb, nombreArchivo);
-            });
-        }
+    });
 </script>
 {% endblock %}
