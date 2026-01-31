@@ -521,23 +521,34 @@ from procesador_gestion import calcular_gestion
 @app.route('/gestiones')
 def gestiones():
     # 1. Definir rutas de archivos
-    path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv') # Sigue siendo CSV
+    path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv') 
     path_gestion = os.path.join(BASE_DIR, 'data', 'gestion.zip')
     
-    # 2. Capturar variables de la URL
-    vista_activa = request.args.get('vista', 'general') # 'general' o 'analistas'
-    analista_f = request.args.get('analista', 'Todos') # Nombre del analista o 'Todos'
+    # 2. Capturar variables de la URL (Filtros)
+    vista_activa = request.args.get('vista', 'general') 
+    analista_f = request.args.get('analista', 'Todos')
     
-    # 3. Llamar a la función pasando el filtro
-    # Si la vista es 'general', podrías forzar 'Todos', pero pasar analista_f es más flexible
-    indicadores = calcular_gestion(path_cartera, path_gestion, analista_seleccionado=analista_f)
+    # --- NUEVO: CAPTURAR FECHAS DEL FORMULARIO ---
+    f_inicio = request.args.get('fecha_inicio') 
+    f_fin = request.args.get('fecha_fin')       
+    
+    # 3. Llamar a la función pasando TODOS los filtros, incluyendo las fechas
+    indicadores = calcular_gestion(
+        path_cartera, 
+        path_gestion, 
+        analista_seleccionado=analista_f,
+        fecha_inicio=f_inicio, # <--- Se pasa al procesador
+        fecha_fin=f_fin        # <--- Se pasa al procesador
+    )
     
     return render_template('gestiones.html',
-                       stats=indicadores,
-                       vista_actual='gestiones',  # <--- Agrega esto para que el Sidebar lo reconozca
-                       vista_detalle=vista_activa,
-                       analista_actual=analista_f,
-                       now=datetime.now())
+                           stats=indicadores,
+                           vista_actual='gestiones',
+                           vista_detalle=vista_activa,
+                           analista_actual=analista_f,
+                           fecha_inicio_sel=f_inicio, # Para que el calendario no se borre al recargar
+                           fecha_fin_sel=f_fin,       # Para que el calendario no se borre al recargar
+                           now=datetime.now())
 
 if __name__ == '__main__':
     # Esto permite que Render asigne el puerto automáticamente

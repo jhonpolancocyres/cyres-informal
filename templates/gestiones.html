@@ -140,13 +140,13 @@
         {% elif vista_detalle == 'analistas' %}
             <div id="seccion-analistas" class="animate__animated animate__fadeIn">
                 
-                <div class="card-body py-2 mb-3">
-                    <form method="GET" action="{{ url_for('gestiones') }}" class="row align-items-center">
-                        <input type="hidden" name="vista" value="analistas"> 
-                        <div class="col-auto"><label class="small fw-bold text-primary">FILTRAR POR ANALISTA:</label></div>
+                <div class="card-body py-3 mb-4 bg-white border rounded-3 shadow-sm">
+                    <form method="GET" action="{{ url_for('gestiones') }}" class="row g-3 align-items-end">
+                        <input type="hidden" name="vista" value="analistas">
+                        
                         <div class="col-md-4">
-                            {# EL FILTRO SIEMPRE MOSTRARA A TODOS PORQUE USA resumen_analistas #}
-                            <select id="filtroan alista" name="analista" class="form-select form-select-sm border-primary shadow-sm" onchange="this.form.submit()">
+                            <label class="small fw-bold text-primary mb-1">ANALISTA:</label>
+                            <select name="analista" class="form-select form-select-sm border-primary shadow-sm">
                                 <option value="Todos">-- Todo el Equipo --</option>
                                 {% for ana in stats.resumen_analistas %}
                                     <option value="{{ ana.USUARIO_GESTION }}" {% if request.args.get('analista') == ana.USUARIO_GESTION %}selected{% endif %}>
@@ -154,6 +154,24 @@
                                     </option>
                                 {% endfor %}
                             </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="small fw-bold text-primary mb-1">DESDE:</label>
+                            <input type="date" name="fecha_inicio" class="form-control form-control-sm border-primary shadow-sm" 
+                                value="{{ request.args.get('fecha_inicio', '') }}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="small fw-bold text-primary mb-1">HASTA:</label>
+                            <input type="date" name="fecha_fin" class="form-control form-control-sm border-primary shadow-sm" 
+                                value="{{ request.args.get('fecha_fin', '') }}">
+                        </div>
+
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary btn-sm w-100 shadow-sm fw-bold">
+                                <i class="fas fa-filter me-1"></i> APLICAR
+                            </button>
                         </div>
                     </form>
                 </div>

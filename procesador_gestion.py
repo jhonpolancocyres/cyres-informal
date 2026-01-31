@@ -2,7 +2,7 @@ import pandas as pd
 import os
 from datetime import datetime
 
-def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
+def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos', fecha_inicio=None, fecha_fin=None):
     try:
         # --- CARGA INTELIGENTE DE CARTERA ---
         if ruta_cartera.endswith('.zip'):
@@ -51,6 +51,25 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
             df_ges['FECHA_DT'] = pd.to_datetime(df_ges['FECHA_GESTION'], dayfirst=True, errors='coerce')
 
         gestiones_mes = df_ges.copy()
+
+        # --- FILTRO DE RANGO DE FECHAS ---
+        if fecha_inicio and fecha_fin:
+            try:
+                # Convertimos strings del form (YYYY-MM-DD) a datetime
+                f_ini = pd.to_datetime(fecha_inicio)
+                f_fin = pd.to_datetime(fecha_fin)
+                
+                # IMPORTANTE: Para que el filtro incluya todo el día final, 
+                # nos aseguramos que f_fin llegue hasta las 23:59:59
+                f_fin = f_fin.replace(hour=23, minute=59, second=59)
+                
+                # Filtramos el DataFrame principal de gestiones
+                df_ges = df_ges[(df_ges['FECHA_DT'] >= f_ini) & (df_ges['FECHA_DT'] <= f_fin)].copy()
+                
+                # También filtramos la copia de 'gestiones_mes' que usas más adelante
+                gestiones_mes = df_ges.copy()
+            except Exception as e:
+                print(f"Error aplicando filtro de fechas: {e}")
 
         # --- LÓGICA DE ANALISTAS MEJORADA ---
         df_ana = gestiones_mes.copy()
@@ -171,7 +190,16 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos'):
                 col_pag_id = 'COD. CLIENTE'
                 df_pagos[col_pag_id] = df_pagos[col_pag_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 
+                # --- AQUÍ VA EL CAMBIO ---
                 df_pagos['FECHA_PAGO_DT'] = pd.to_datetime(df_pagos['FECHA PAGO'], dayfirst=True, errors='coerce')
+
+                # --- FILTRO DE FECHAS EN PAGOS ---
+                if fecha_inicio and fecha_fin:
+                    f_ini_p = pd.to_datetime(fecha_inicio)
+                    f_fin_p = pd.to_datetime(fecha_fin).replace(hour=23, minute=59, second=59)
+                    df_pagos = df_pagos[(df_pagos['FECHA_PAGO_DT'] >= f_ini_p) & (df_pagos['FECHA_PAGO_DT'] <= f_fin_p)].copy()
+                # -------------------------
+
                 df_pagos['FECHA_REF'] = df_pagos['FECHA_PAGO_DT'].dt.strftime('%Y-%m-%d')
                 df_pagos['VALOR_PAGADO'] = pd.to_numeric(df_pagos['VALOR PAGADO'], errors='coerce').fillna(0)
                 df_pagos = df_pagos[df_pagos['VALOR_PAGADO'] > 0].copy()
