@@ -15,6 +15,19 @@
 <div class="p-4"> 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3 class="fw-bold mb-0">Informe de Presupuesto Informales</h3>
+        
+        <div class="d-flex align-items-center gap-2">
+            <span class="small fw-bold text-muted">PERIODO:</span>
+            <select class="form-select form-select-sm shadow-sm" id="filtroMes" style="min-width: 120px;">
+                <option value="1" {{ 'selected' if mes_actual == 1 }}>Enero</option>
+                <option value="2" {{ 'selected' if mes_actual == 2 }}>Febrero</option>
+                <option value="3" {{ 'selected' if mes_actual == 3 }}>Marzo</option>
+            </select>
+            <select class="form-select form-select-sm shadow-sm" id="filtroAnio" style="min-width: 90px;">
+                <option value="2025" {{ 'selected' if anio_actual == 2025 }}>2025</option>
+                <option value="2026" {{ 'selected' if anio_actual == 2026 }}>2026</option>
+            </select>
+        </div>
     </div>
 
         <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
@@ -407,6 +420,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 }); 
+document.addEventListener('DOMContentLoaded', function() {
+    const fMes = document.getElementById('filtroMes');
+    const fAnio = document.getElementById('filtroAnio');
+
+    function cambiarPeriodo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('mes', fMes.value);
+        urlParams.set('anio', fAnio.value);
+        // Esto es clave para que se quede en la pestaña de Detalle y no te mande al Inicio
+        urlParams.set('vista', 'detalle_analisis'); 
+        
+        window.location.href = `/?${urlParams.toString()}`;
+    }
+
+    if (fMes) fMes.addEventListener('change', cambiarPeriodo);
+    if (fAnio) fAnio.addEventListener('change', cambiarPeriodo);
+});
 
 </script>
 

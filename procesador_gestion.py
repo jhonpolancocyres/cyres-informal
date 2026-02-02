@@ -1,9 +1,21 @@
 import pandas as pd
 import os
 from datetime import datetime
+import calendar
 
-def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos', fecha_inicio=None, fecha_fin=None):
+def calcular_gestion(ruta_cartera, ruta_gestion, ruta_pagos=None, analista_seleccionado='Todos', fecha_inicio=None, fecha_fin=None, mes_actual=2, anio_actual=2026):
+    ahora = datetime.now()
+
+    # LÓGICA DE MÁQUINA DEL TIEMPO
+    if mes_actual == ahora.month and anio_actual == ahora.year:
+        # Si es el mes vivo, la referencia es hoy
+        fecha_referencia = ahora
+    else:
+        # Si es un histórico, la referencia es el último día de ese mes
+        ultimo_dia = calendar.monthrange(anio_actual, mes_actual)[1]
+        fecha_referencia = datetime(anio_actual, mes_actual, ultimo_dia, 23, 59, 59)
     try:
+
         # --- CARGA INTELIGENTE DE CARTERA ---
         if ruta_cartera.endswith('.zip'):
             df_car = pd.read_csv(ruta_cartera, sep=';', encoding='latin1', compression='zip')
@@ -16,12 +28,25 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos', 
         else:
             df_ges = pd.read_csv(ruta_gestion, sep=';', encoding='latin1')
 
+        # --- CARGA DE PAGOS DINÁMICA ---
+        if ruta_pagos and os.path.exists(ruta_pagos):
+            df_pag = pd.read_csv(ruta_pagos, sep=';', encoding='latin1')
+        else:
+            df_pag = pd.DataFrame(columns=['FECHA PAGO', 'VALOR PAGADO', 'COD. CLIENTE'])
+
+        # Limpieza de columnas (Asegúrate de que df_pag esté aquí)
         df_car.columns = df_car.columns.str.strip()
         df_ges.columns = df_ges.columns.str.strip()
+        df_pag.columns = df_pag.columns.str.strip()
 
         # CREAMOS LA COPIA MAESTRA ANTES DE FILTRAR PARA EL RANKING
+        # --- CARGA DE GESTIÓN (FORMATO 12/02/2026) ---
         df_ges_maestra = df_ges.copy()
-        df_ges_maestra['FECHA_DT'] = pd.to_datetime(df_ges_maestra['FECHA_GESTION'], dayfirst=True, errors='coerce') 
+        df_ges_maestra['FECHA_DT'] = pd.to_datetime(
+            df_ges_maestra['FECHA_GESTION'].astype(str), 
+            format='%d/%m/%Y', 
+            errors='coerce'
+        )
 
         # 3. FILTRO DE ANALISTA (Este ya lo tienes, déjalo igual)
         if analista_seleccionado != 'Todos':
@@ -102,11 +127,12 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos', 
         ultima_gest = gestiones_mes.sort_values('FECHA_DT').groupby(col_ges_id).last()
         df_master = pd.merge(df_car, ultima_gest[['CONTACTO', 'FECHA_DT']], left_on=col_car_id, right_index=True, how='left')
 
-        # Usar la fecha actual del sistema para la inactividad
-        hoy = datetime.now()
+        # --- CLASIFICACIÓN DE ANTIGÜEDAD (MÁQUINA DEL TIEMPO) ---
         def clasificar_antiguedad(fecha):
             if pd.isnull(fecha): return "1. Sin Gestión"
-            dias = (hoy - fecha).days
+            # Comparamos contra el cierre de mes o contra hoy
+            dias = (fecha_referencia - fecha).days
+            
             if dias <= 0: return "2. Gestión Hoy"
             if dias == 1: return "3. Gestión Ayer"
             if 2 <= dias <= 5: return "4. Sin gestión (2-5 días)"
@@ -153,13 +179,26 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos', 
                 'FECHA_ULTIMA': fecha_gest
             })
 
-        # --- RANKING DEL DÍA (Sustituye tu bloque actual por este) ---
-        hoy_dt = hoy.date()
-        gestiones_hoy = df_ges[df_ges['FECHA_DT'].dt.date == hoy_dt].copy()
-        ranking_dia_final = []
+        # --- CLASIFICACIÓN DE ANTIGÜEDAD (MÁQUINA DEL TIEMPO) ---
+        def clasificar_antiguedad(fecha):
+            if pd.isnull(fecha): return "1. Sin Gestión"
+            # Comparamos contra el cierre de mes o contra hoy
+            dias = (fecha_referencia - fecha).days
+            
+            if dias <= 0: return "2. Gestión Hoy"
+            if dias == 1: return "3. Gestión Ayer"
+            if 2 <= dias <= 5: return "4. Sin gestión (2-5 días)"
+            if 6 <= dias <= 10: return "5. Sin gestión (6-10 días)"
+            if 11 <= dias <= 15: return "6. Sin gestión (11-15 días)"
+            return "7. Sin gestión (+15 días)"
 
-        # --- RANKING DEL DÍA (ORDENADO POR EFECTIVIDAD) ---
-        hoy_dt = hoy.date()
+        df_master['RANGO_GESTION'] = df_master['FECHA_DT'].apply(clasificar_antiguedad)
+
+        # ... (Mantén tu código intermedio de matrices y listas igual) ...
+
+        # --- RANKING DEL DÍA (CORREGIDO PARA HISTÓRICOS) ---
+        # Si es Enero, hoy_dt será 31/01. Si es Febrero actual, será hoy.
+        hoy_dt = fecha_referencia.date() 
         gestiones_hoy = df_ges[df_ges['FECHA_DT'].dt.date == hoy_dt].copy()
         ranking_dia_final = []
 
@@ -171,35 +210,47 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos', 
 
             efec_hoy = gestiones_hoy[gestiones_hoy['CONTACTO'] == 'EFECTIVO'].groupby(col_user).size()
             ranking_dia_df['efectivos'] = ranking_dia_df[col_user].map(efec_hoy).fillna(0).astype(int)
-            
-            # Cálculo: Efectivos / Gestiones Totales
             ranking_dia_df['porc_efec'] = ((ranking_dia_df['efectivos'] / ranking_dia_df['gestiones_totales']) * 100).round(1).fillna(0)
             
             ranking_dia_df = ranking_dia_df[ranking_dia_df[col_user] != 'Jhon Polanco']
-
-            # --- CAMBIO AQUÍ: Ordenamos por porcentaje de mayor a menor ---
             ranking_dia_final = ranking_dia_df.sort_values(by='porc_efec', ascending=False).to_dict(orient='records')
 
         # --- LÓGICA DE RECAUDO MODIFICADA ---
         recaudo_stats_final = {'labels': [], 'valores': [], 'ranking': []}
         try:
-            ruta_pagos = ruta_gestion.replace('gestion.zip', 'PagosConsolidado.csv')
-            if os.path.exists(ruta_pagos):
-                df_pagos = pd.read_csv(ruta_pagos, sep=';', encoding='latin1')
+            
+            
+            # 9. INTEGRACIÓN CON PAGOS (RECAUDO REAL)
+            if not df_pag.empty:
+                df_pagos = df_pag.copy() # Usamos la copia del que cargamos arriba
                 df_pagos.columns = df_pagos.columns.str.strip()
+                
+                # 1. Limpieza de código cliente (Mantenlo siempre)
                 col_pag_id = 'COD. CLIENTE'
                 df_pagos[col_pag_id] = df_pagos[col_pag_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 
-                # --- AQUÍ VA EL CAMBIO ---
-                df_pagos['FECHA_PAGO_DT'] = pd.to_datetime(df_pagos['FECHA PAGO'], dayfirst=True, errors='coerce')
+                # 2. CARGA DE FECHAS (FORMATO MULTIPLE)
+                # Intentamos barras
+                df_pagos['FECHA_PAGO_DT'] = pd.to_datetime(df_pagos['FECHA PAGO'].astype(str), format='%d/%m/%Y', errors='coerce')
+                
+                # Si falló, intentamos puntos (para febrero)
+                mask_nan = df_pagos['FECHA_PAGO_DT'].isna()
+                if mask_nan.any():
+                    df_pagos.loc[mask_nan, 'FECHA_PAGO_DT'] = pd.to_datetime(df_pagos.loc[mask_nan, 'FECHA PAGO'].astype(str), format='%d.%m.%Y', errors='coerce')
 
-                # --- FILTRO DE FECHAS EN PAGOS ---
+                # 3. FILTRO DE FECHAS SEGÚN EL SELECTOR O CALENDARIO
                 if fecha_inicio and fecha_fin:
                     f_ini_p = pd.to_datetime(fecha_inicio)
                     f_fin_p = pd.to_datetime(fecha_fin).replace(hour=23, minute=59, second=59)
                     df_pagos = df_pagos[(df_pagos['FECHA_PAGO_DT'] >= f_ini_p) & (df_pagos['FECHA_PAGO_DT'] <= f_fin_p)].copy()
-                # -------------------------
+                else:
+                    # SI NO HAY CALENDARIO, USAMOS EL MES QUE ELEGISTE EN EL NUEVO SELECTOR
+                    df_pagos = df_pagos[
+                        (df_pagos['FECHA_PAGO_DT'].dt.month == mes_actual) & 
+                        (df_pagos['FECHA_PAGO_DT'].dt.year == anio_actual)
+                    ].copy()
 
+                # --- LAS LÍNEAS CLAVE QUE FALTABAN ---
                 df_pagos['FECHA_REF'] = df_pagos['FECHA_PAGO_DT'].dt.strftime('%Y-%m-%d')
                 df_pagos['VALOR_PAGADO'] = pd.to_numeric(df_pagos['VALOR PAGADO'], errors='coerce').fillna(0)
                 df_pagos = df_pagos[df_pagos['VALOR_PAGADO'] > 0].copy()
@@ -242,7 +293,7 @@ def calcular_gestion(ruta_cartera, ruta_gestion, analista_seleccionado='Todos', 
 
                 recaudo_stats_final = {
                     'labels': df_time_rec['FECHA_PAGO_DT'].dt.strftime('%d-%m').tolist(),
-                    'valores': df_time_rec['monto'].tolist() if 'monto' in df_time_rec else df_time_rec['VALOR_PAGADO'].tolist(),
+                    'valores': df_time_rec['VALOR_PAGADO'].tolist(),
                     'ranking': rank_completo.to_dict(orient='records')
                 }
         except:

@@ -364,6 +364,18 @@
                         <option value="{{ c }}" {{ 'selected' if ciudad_actual == c }}>{{ c }}</option>
                         {% endfor %}
                     </select>
+                    <div class="d-flex align-items-center gap-2 me-3">
+                    <span class="small fw-bold text-muted">PERIODO:</span>
+                    <select class="form-select form-select-sm shadow-sm" id="filtroMes" style="min-width: 120px;">
+                        <option value="1" {{ 'selected' if mes_actual == 1 }}>Enero</option>
+                        <option value="2" {{ 'selected' if mes_actual == 2 }}>Febrero</option>
+                        <option value="3" {{ 'selected' if mes_actual == 3 }}>Marzo</option>
+                        </select>
+                    <select class="form-select form-select-sm shadow-sm" id="filtroAnio" style="min-width: 90px;">
+                        <option value="2025" {{ 'selected' if anio_actual == 2025 }}>2025</option>
+                        <option value="2026" {{ 'selected' if anio_actual == 2026 }}>2026</option>
+                    </select>
+                </div>
                 </div>
                 <div class="btn-group shadow-sm">
                     <a href="/?vista=cyres&ciudad={{ ciudad_actual }}" class="btn btn-sm px-4 fw-bold {{ 'btn-primary text-white' if vista_actual == 'cyres' else 'btn-white border' }}">Vista Cyres</a>
@@ -773,5 +785,18 @@
             }
 
         }); // <--- Cierre de DOMContentLoaded
+
+        const fMes = document.getElementById('filtroMes');
+            const fAnio = document.getElementById('filtroAnio');
+
+            function cambiarPeriodo() {
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.set('mes', fMes.value);
+                urlParams.set('anio', fAnio.value);
+                window.location.href = `/?${urlParams.toString()}`;
+            }
+
+            if (fMes) fMes.addEventListener('change', cambiarPeriodo);
+            if (fAnio) fAnio.addEventListener('change', cambiarPeriodo);
 </script>
 {% endblock %}

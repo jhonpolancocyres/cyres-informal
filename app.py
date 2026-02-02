@@ -221,15 +221,30 @@ def index():
     vista = request.args.get('vista', 'cyres')
     ciudad = request.args.get('ciudad', 'Todas')
 
-    # --- FECHAS GENERALES ---
     ahora = datetime.now()
-    mes_actual = ahora.month
-    anio_actual = ahora.year
+    mes_actual_real = ahora.month
+    anio_actual_real = ahora.year
 
-    # --- LLAMADA A LAS FECHAS ---
-    fecha_act_cartera = obtener_fecha_archivo(RUTA_CARTERA)
-    fecha_act_pagos = obtener_fecha_archivo(RUTA_PAGOS)
+    # Capturamos mes y año del selector (si no hay, usa el actual)
+    mes_actual = int(request.args.get('mes', mes_actual_real))
+    anio_actual = int(request.args.get('anio', anio_actual_real))
+
+    # --- DEFINIR RUTAS SEGÚN EL MES SELECCIONADO ---
+    if mes_actual == mes_actual_real and anio_actual == anio_actual_real:
+        path_proyectado = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv')
+        path_pagos = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.csv')
+    else:
+        path_proyectado = os.path.join(BASE_DIR, 'data', 'historico', f'Proyectadoconsolidado_{anio_actual}_{mes_actual:02d}.csv')
+        path_pagos = os.path.join(BASE_DIR, 'data', 'historico', f'PagosConsolidado_{anio_actual}_{mes_actual:02d}.csv')
+
+    # Para que no te de error de "folder_data", definimos esta variable que usas más adelante
+    folder_data = os.path.join(BASE_DIR, 'data')
+
+    # Actualizamos las fechas de los archivos para la interfaz
+    fecha_act_cartera = obtener_fecha_archivo(path_proyectado)
+    fecha_act_pagos = obtener_fecha_archivo(path_pagos)
     
+    # --- TUS VARIABLES DE SIEMPRE (Mantenlas tal cual están en tu código) ---
     kpis_calculados = {
         'ingresos': 0, 'presupuesto': 0, 'desviacion': 0, 
         'efectividad': 0, 'presupuesto_actual': 0, 'ingresos_actual': 0,
@@ -242,38 +257,54 @@ def index():
     }
 
     operaciones_tabla = []
-    detalle_clientes_grafica = {} # Inicializamos el diccionario de clientes
+    detalle_clientes_grafica = {} 
     detalle_presupuesto_grafica = {}
 
+    
     if vista == 'detalle_analisis':
         try:
             
-            folder_data = os.path.join(BASE_DIR, 'data')
-            ahora = datetime.now()
-            mes_actual = datetime.now().month
-            anio_actual = datetime.now().year
             ultimo_dia = calendar.monthrange(anio_actual, mes_actual)[1]
 
+            # --- LÓGICA DE CORTE PARA EL PRESUPUESTO ACTUAL ---
+            ahora_real = datetime.now()
+            # Si el mes es Enero (pasado), el corte es el último día (31)
+            if anio_actual < ahora_real.year or (anio_actual == ahora_real.year and mes_actual < ahora_real.month):
+                dia_corte = ultimo_dia
+            # Si es el mes actual (Febrero), el corte es ayer
+            elif mes_actual == ahora_real.month and anio_actual == ahora_real.year:
+                dia_corte = ahora_real.day - 1 if ahora_real.day > 1 else 1
+            else:
+                dia_corte = 1
+
             # A.1. Leer Presupuesto (CORREGIDO)
-            path_proyectado = os.path.join(folder_data, 'Proyectadoconsolidado.csv')
             df_filtrado = pd.DataFrame()
             if os.path.exists(path_proyectado):
                 df_proy = pd.read_csv(path_proyectado, sep=';', encoding='latin1')
-                df_proy.columns = df_proy.columns.str.strip()
                 
-                # 1. Intentamos leer la fecha sin forzar formato (Pandas detecta YYYY-MM-DD del CSV)
-                df_proy['Fecha_Vencimiento'] = pd.to_datetime(df_proy['Fecha_Vencimiento'], errors='coerce')
+                # --- AJUSTE PARA FORMATO CON PUNTOS (10.02.2026) ---
+                # Convertimos la columna a fecha especificando el formato de puntos
+                df_proy['Fecha_Vencimiento'] = pd.to_datetime(
+                    df_proy['Fecha_Vencimiento'].astype(str), 
+                    format='%d.%m.%Y', 
+                    errors='coerce'
+                )
                 
-                # 2. Si falló (NaT), intentamos el formato con puntos que viene del Maestro
-                if df_proy['Fecha_Vencimiento'].isna().all():
-                    df_proy['Fecha_Vencimiento'] = pd.to_datetime(df_proy['Fecha_Vencimiento'], format='%d.%m.%Y', errors='coerce')
-                
-                # 3. FILTRO: Mes actual, Año actual Y que esté PENDIENTE
-                # Nota: Asegúrate de que anio_actual coincida con el de tus archivos (2026)
+                # Si por alguna razón hay fechas con guiones o barras, esto las rescata:
+                mask_nan = df_proy['Fecha_Vencimiento'].isna()
+                if mask_nan.any():
+                    df_proy.loc[mask_nan, 'Fecha_Vencimiento'] = pd.to_datetime(
+                        df_proy.loc[mask_nan, 'Fecha_Vencimiento'], 
+                        errors='coerce'
+                    )
+                # ---------------------------------------------------
+
                 filtro = (df_proy['Fecha_Vencimiento'].dt.month == mes_actual) & \
                          (df_proy['Fecha_Vencimiento'].dt.year == anio_actual)
                 
                 df_filtrado = df_proy[filtro].copy()
+                
+                # Filtrar y continuar con el resto del código...
 
                 def limpiar_monto(serie):
                     return pd.to_numeric(serie.astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(0)
@@ -285,7 +316,6 @@ def index():
                     print(f"ADVERTENCIA: No hay datos PENDIENTES para {mes_actual}/{anio_actual}")
 
             # A.2. Leer Ingresos
-            path_pagos = os.path.join(folder_data, 'PagosConsolidado.csv')
             if os.path.exists(path_pagos):
                 df_pagos = pd.read_csv(path_pagos, sep=';', encoding='latin1')
                 df_pagos.columns = df_pagos.columns.str.strip()
@@ -336,19 +366,18 @@ def index():
                             lista_ppto = [float(fila.get(d, 0)) for d in range(1, ultimo_dia + 1)]
                             detalle_presupuesto_grafica[str(cod)] = lista_ppto
 
-                    # Cálculos "Actual" (Corte ayer)
-                    dia_hoy = datetime.now().day
-                    dia_ayer = dia_hoy - 1 if dia_hoy > 1 else 1
+                    # Usamos dia_corte (que será 31 para enero o 1 para febrero)
+                    filtro_corte = df_filtrado['Fecha_Vencimiento'].dt.day <= dia_corte
+                    kpis_calculados['presupuesto_actual'] = pd.to_numeric(df_filtrado[filtro_corte]['TOTAL CARTERA'], errors='coerce').fillna(0).sum()
 
-                    filtro_ayer = df_filtrado['Fecha_Vencimiento'].dt.day <= dia_ayer
-                    presupuesto_ayer = pd.to_numeric(df_filtrado[filtro_ayer]['TOTAL CARTERA'], errors='coerce').fillna(0).sum()
-                    kpis_calculados['presupuesto_actual'] = presupuesto_ayer
-
-                    # Reemplazo para asegurar que la caja de abajo siempre se actualice con el total
-                    filtro_hoy = df_filtrado['Fecha_Vencimiento'].dt.day <= dia_hoy
+                    # DESVIACIÓN ACTUAL: Ingresos totales vs Presupuesto al día de corte
                     kpis_calculados['ingresos_actual'] = kpis_calculados['ingresos']
                     kpis_calculados['desviacion_actual'] = kpis_calculados['ingresos'] - kpis_calculados['presupuesto_actual']
-                    kpis_calculados['ejecucion_actual'] = (kpis_calculados['ingresos'] / kpis_calculados['presupuesto_actual'] * 100) if kpis_calculados['presupuesto_actual'] > 0 else 0
+                    
+                    if kpis_calculados['presupuesto_actual'] > 0:
+                        kpis_calculados['ejecucion_actual'] = (kpis_calculados['ingresos'] / kpis_calculados['presupuesto_actual'] * 100)
+                    else:
+                        kpis_calculados['ejecucion_actual'] = 0
 
 
                     # --- CONSOLIDACIÓN POR CLIENTE PARA LA TABLA ---
@@ -359,7 +388,7 @@ def index():
                         df_cli_proy = df_filtrado.groupby([col_cod, col_razon]).agg(Presupuesto_Mensual=('TOTAL CARTERA', 'sum')).reset_index()
                         df_cli_proy.columns = ['COD_CLIENTE', 'RAZON_SOCIAL', 'Presupuesto_Mensual']
 
-                        df_ayer_cli = df_filtrado[df_filtrado['Fecha_Vencimiento'].dt.day <= dia_ayer]
+                        df_ayer_cli = df_filtrado[df_filtrado['Fecha_Vencimiento'].dt.day <= dia_corte]
                         df_cli_proy_actual = df_ayer_cli.groupby(col_cod)['TOTAL CARTERA'].sum().reset_index() if not df_ayer_cli.empty else pd.DataFrame(columns=[col_cod, 'Presupuesto_Actual'])
                         df_cli_proy_actual.columns = ['COD_CLIENTE', 'Presupuesto_Actual']
 
@@ -373,28 +402,19 @@ def index():
                         tabla_clientes['Efe_Actual'] = (tabla_clientes['Ingresos_Recibidos'] / tabla_clientes['Presupuesto_Actual'] * 100).replace([float('inf')], 0).fillna(0)
                         tabla_clientes['Efe_Mensual'] = (tabla_clientes['Ingresos_Recibidos'] / tabla_clientes['Presupuesto_Mensual'] * 100).replace([float('inf')], 0).fillna(0)
 
-                        # --- AGREGADO: ORDENAR POR PRESUPUESTO MENSUAL MAYOR A MENOR ---
+                        # 1. Primero se ordena la tabla (Mantenlo)
                         tabla_clientes = tabla_clientes.sort_values(by='Presupuesto_Mensual', ascending=False)
-
                         operaciones_tabla = tabla_clientes.to_dict(orient='records')
 
+            # 2. JUSTO DEBAJO (Saliendo de un nivel de sangría), pones las desviaciones:
             kpis_calculados['desviacion'] = kpis_calculados['ingresos'] - kpis_calculados['presupuesto']
             if kpis_calculados['presupuesto'] > 0:
                 kpis_calculados['efectividad'] = (kpis_calculados['ingresos'] / kpis_calculados['presupuesto']) * 100
-        
-            if os.path.exists(path_proyectado):
-                df_proy = pd.read_csv(path_proyectado, sep=';', encoding='latin1')
-                print(f"DEBUG: Columnas encontradas: {df_proy.columns.tolist()}")
-                # ... resto del código ...
-                df_filtrado = df_proy[filtro]
-                print(f"DEBUG: Filas encontradas para el mes {mes_actual}: {len(df_filtrado)}")
-        
+            else:
+                kpis_calculados['efectividad'] = 0
+
         except Exception as e:
             print(f"Error en detalle: {e}")
-
-        # FUERZA BRUTA: Justo antes de enviar a la página, igualamos
-        kpis_calculados['ingresos_actual'] = kpis_calculados['ingresos']
-        print(">>> SI VES ESTO, EL CODIGO SI SE ACTUALIZO <<<")
 
         return render_template('detalle.html', 
                                kpis=kpis_calculados, 
@@ -410,8 +430,14 @@ def index():
                                fecha_pagos=fecha_act_pagos)
     
 
+    # Justo antes de llamar a la vista general, actualizamos las rutas globales
+    global RUTA_CARTERA, RUTA_PAGOS
+    RUTA_CARTERA = path_proyectado
+    RUTA_PAGOS = path_pagos
+
     datos = procesar_informacion(vista, ciudad)
-    if datos is None: return "<h1>Error</h1>"
+    
+    if datos is None: return "<h1>Error en el procesamiento de datos</h1>"
 
     return render_template('index.html', 
                            **datos, 
@@ -520,35 +546,52 @@ from procesador_gestion import calcular_gestion
 
 @app.route('/gestiones')
 def gestiones():
-    # 1. Definir rutas de archivos
-    path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv') 
-    path_gestion = os.path.join(BASE_DIR, 'data', 'gestion.zip')
+    ahora_real = datetime.now()
     
-    # 2. Capturar variables de la URL (Filtros)
+    # 1. CAPTURAR VARIABLES DE LA URL
+    mes_actual = int(request.args.get('mes', ahora_real.month))
+    anio_actual = int(request.args.get('anio', ahora_real.year))
     vista_activa = request.args.get('vista', 'general') 
     analista_f = request.args.get('analista', 'Todos')
-    
-    # --- NUEVO: CAPTURAR FECHAS DEL FORMULARIO ---
     f_inicio = request.args.get('fecha_inicio') 
-    f_fin = request.args.get('fecha_fin')       
-    
-    # 3. Llamar a la función pasando TODOS los filtros, incluyendo las fechas
-    indicadores = calcular_gestion(
-        path_cartera, 
-        path_gestion, 
-        analista_seleccionado=analista_f,
-        fecha_inicio=f_inicio, # <--- Se pasa al procesador
-        fecha_fin=f_fin        # <--- Se pasa al procesador
-    )
-    
+    f_fin = request.args.get('fecha_fin')
+
+    # 2. DEFINIR RUTAS DINÁMICAS (Aquí añadimos los pagos)
+    if mes_actual == ahora_real.month and anio_actual == ahora_real.year:
+        path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv') 
+        path_gestion = os.path.join(BASE_DIR, 'data', 'gestion.zip')
+        path_pagos = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.csv') # <-- NEW: Mes actual
+    else:
+        # Meses pasados: busca en la carpeta 'historico'
+        path_cartera = os.path.join(BASE_DIR, 'data', 'historico', f'Proyectadoconsolidado_{anio_actual}_{mes_actual:02d}.csv')
+        path_gestion = os.path.join(BASE_DIR, 'data', 'historico', f'gestion_{anio_actual}_{mes_actual:02d}.zip')
+        # ESTA ES LA LÍNEA QUE FALTA PARA QUE ENERO TRAIGA RECAUDO:
+        path_pagos = os.path.join(BASE_DIR, 'data', 'historico', f'PagosConsolidado_{anio_actual}_{mes_actual:02d}.csv')
+
+    # 3. LLAMAR AL PROCESADOR
+    try:
+        indicadores = calcular_gestion(
+            path_cartera, 
+            path_gestion,
+            ruta_pagos=path_pagos, # <-- NEW: Le pasamos la ruta al procesador
+            analista_seleccionado=analista_f,
+            fecha_inicio=f_inicio, 
+            fecha_fin=f_fin,
+            mes_actual=mes_actual,
+            anio_actual=anio_actual
+        )
+    except Exception as e:
+        print(f"Error en procesador: {e}")
+        indicadores = {} 
+
     return render_template('gestiones.html',
                            stats=indicadores,
                            vista_actual='gestiones',
                            vista_detalle=vista_activa,
                            analista_actual=analista_f,
-                           fecha_inicio_sel=f_inicio, # Para que el calendario no se borre al recargar
-                           fecha_fin_sel=f_fin,       # Para que el calendario no se borre al recargar
-                           now=datetime.now())
+                           mes_actual=mes_actual,
+                           anio_actual=anio_actual,
+                           now=ahora_real)
 
 if __name__ == '__main__':
     # Esto permite que Render asigne el puerto automáticamente
