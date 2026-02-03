@@ -1,0 +1,230 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <div class="header-seccion mb-4">
+        <h3 class="fw-bold text-dark">Análisis Histórico</h3>
+        <p class="text-muted">Consolidado de gestión (Valores expresados en millones de COP)</p>
+    </div>
+
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm border-0 pt-3">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold text-primary mb-4">
+                        <i class="bi bi-cash-stack me-2"></i>Histórico de Recaudo Mensual
+                    </h5>
+                    <div style="height: 350px;">
+                        <canvas id="chartRecaudoHistorico"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm border-0 pt-3">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold text-danger mb-4">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Histórico de Morosidad y % de Mora
+                    </h5>
+                    <div style="height: 400px; position: relative;">
+                        <canvas id="chartMora"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
+    <div class="row mt-2">
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm border-0 pt-3">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold text-primary mb-4">
+                        <i class="bi bi-credit-card-2-back-fill me-2"></i>Participación por Método de Pago (%)
+                    </h5>
+                    
+                    <div style="height: 400px; position: relative;">
+                        <canvas id="chartParticipacion"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- CONFIGURACIÓN GRÁFICA 1 (RECAUDO) ---
+    const ctxRecaudo = document.getElementById('chartRecaudoHistorico');
+    new Chart(ctxRecaudo, {
+        type: 'bar',
+        plugins: [ChartDataLabels],
+        data: {
+            labels: {{ labels_recaudo | tojson }},
+            datasets: [{
+                label: 'Recaudo Mensual',
+                data: {{ data_recaudo | tojson }},
+                backgroundColor: {{ colores_recaudo | tojson }},
+                borderColor: {{ colores_recaudo | tojson }},
+                borderWidth: 1,
+                borderRadius: 5,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 35 } },
+            plugins: {
+                tooltip: { enabled: false },
+                legend: { display: false },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    formatter: (value) => '$' + value.toLocaleString('es-CO'),
+                    font: { weight: 'bold', size: 14 },
+                    color: '#475569'
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, display: false, grid: { display: false } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // --- CONFIGURACIÓN GRÁFICA 2 (MORA) ---
+    const ctxMora = document.getElementById('chartMora');
+    new Chart(ctxMora, {
+        plugins: [ChartDataLabels],
+        data: {
+            labels: {{ labels_mora | tojson }},
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Valor en Mora',
+                    data: {{ data_mora_val | tojson }},
+                    backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                    borderColor: '#ef4444',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    yAxisID: 'y',
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (val) => '$' + val.toLocaleString('es-CO'),
+                        color: '#ef4444',
+                        font: { weight: 'bold', size: 12 }
+                    }
+                },
+                {
+                    type: 'line',
+                    label: '% Morosidad',
+                    data: {{ data_mora_pct | tojson }},
+                    borderColor: '#1e293b',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#1e293b',
+                    pointRadius: 4,
+                    fill: false,
+                    tension: 0.3,
+                    yAxisID: 'y1',
+                    datalabels: {
+                        anchor: 'center',
+                        align: 'bottom',
+                        offset: 10,
+                        formatter: (val) => val + '%',
+                        color: '#1e293b',
+                        font: { weight: 'bold', size: 12 }
+                    }
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 35, bottom: 10 } },
+            scales: {
+                y: { type: 'linear', position: 'left', display: false, beginAtZero: true },
+                y1: { type: 'linear', position: 'right', display: false, beginAtZero: true, grid: { drawOnChartArea: false } },
+                x: { grid: { display: false } }
+            },
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: { enabled: false }
+            }
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+        const ctxP = document.getElementById('chartParticipacion').getContext('2d');
+        
+        new Chart(ctxP, {
+            type: 'line',
+            data: {
+                labels: {{ labels_linea_es|tojson }},
+                datasets: {{ datasets_linea|tojson }}
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: { top: 10, bottom: 0, left: 10, right: 10 }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 25,
+                            usePointStyle: true,
+                            font: { size: 12, weight: '500' }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#1e293b',
+                        bodyColor: '#1e293b',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: true,
+                        // --- LÓGICA DE ORDENAMIENTO DE MAYOR A MENOR ---
+                        itemSort: function(a, b) {
+                            return b.raw - a.raw; 
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.dataset.label}: ${context.parsed.y}%`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        border: { display: false },
+                        ticks: {
+                            callback: function(value) { return value + '%'; },
+                            stepSize: 20,
+                            color: '#64748b'
+                        },
+                        grid: {
+                            borderDash: [5, 5],
+                            color: '#f1f5f9'
+                        }
+                    },
+                    x: {
+                        border: { display: false },
+                        grid: { display: false },
+                        ticks: { color: '#64748b' }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

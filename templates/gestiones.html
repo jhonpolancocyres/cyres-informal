@@ -267,7 +267,7 @@
                             </div>
                         </div>
                     </div>
-
+                    
                     <div class="col-md-4">
                         <div class="table-container-custom h-100 bg-white p-3 border-top border-4 border-success">
                             <h6 class="fw-bold text-success mb-3 small text-uppercase">Ranking de Recaudo (Mes)</h6>
@@ -312,6 +312,7 @@
                             </div>
                         </div>
                     </div>
+                    
 
                     <div class="col-md-4">
                         <div class="table-container-custom h-100 bg-white p-3 border-top border-4 border-primary">
@@ -348,7 +349,69 @@
                         </div>
                     </div>
                 </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between mb-4">
+                                    <h5 class="card-title fw-bold text-dark mb-0">
+                                        <i class="bi bi-cash-stack me-2 text-success"></i>Recaudo por Analista y Método
+                                    </h5>
+                                    <span class="badge bg-light text-dark border">
+                                        Periodo: {{ mes_actual }}/{{ anio_actual }}
+                                    </span>
+                                </div>
 
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle border-top" id="tabla-recaudo-analistas">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 30%;">Analista</th>
+                                                <th class="text-end">Wallet</th>
+                                                <th class="text-end">Transferencia</th>
+                                                <th class="text-end">Consignación</th>
+                                                <th class="text-end fw-bold bg-light">Total General</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% if pagos_analista_metodo %}
+                                                {% for analista, datos in pagos_analista_metodo.items() %}
+                                                    {# Mostramos todos si es 'Todos', o filtramos por el seleccionado #}
+                                                    {% if analista_actual == 'Todos' or analista_actual == analista %}
+                                                    <tr>
+                                                        <td>
+                                                            <div class="d-flex align-items-center">
+                                                                <div class="avatar-sm-text me-2" style="width:24px; height:24px; background:#e9ecef; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">
+                                                                    {{ analista[:1] }}
+                                                                </div>
+                                                                <span class="fw-medium">{{ analista }}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-end text-muted">$ {{ "{:,.0f}".format(datos.get('WALLET', 0)) }}</td>
+                                                        <td class="text-end text-muted">$ {{ "{:,.0f}".format(datos.get('TRANSFERENCIA', 0)) }}</td>
+                                                        <td class="text-end text-muted">$ {{ "{:,.0f}".format(datos.get('CONSIGNACIÓN', 0)) }}</td>
+                                                        <td class="text-end fw-bold text-primary bg-light">
+                                                            $ {{ "{:,.0f}".format(datos.get('TOTAL', 0)) }}
+                                                        </td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% else %}
+                                                <tr>
+                                                    <td colspan="5" class="text-center py-4 text-muted">
+                                                        <i class="bi bi-info-circle me-2"></i>No hay datos de pagos procesados para este mes.
+                                                    </td>
+                                                </tr>
+                                            {% endif %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+    
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="table-container-custom bg-white p-4">
@@ -374,6 +437,8 @@
         {% endif %}
     </div>
 </div>
+
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -429,26 +494,28 @@
         });
     }
         document.addEventListener('DOMContentLoaded', function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const seleccionado = urlParams.get('analista');
+            const urlParams = new URLSearchParams(window.location.search);
+            const seleccionado = urlParams.get('analista');
 
-        if (seleccionado && seleccionado !== 'Todos') {
-            // Buscamos todas las filas de la tabla de Recaudo
-            // Suponiendo que la tabla es la segunda o tiene una clase específica
-            const filas = document.querySelectorAll('table:nth-of-type(2) tbody tr'); 
-            
-            filas.forEach(fila => {
-                const nombreAnalista = fila.cells[0].innerText.trim();
-                if (nombreAnalista === seleccionado) {
-                    fila.style.backgroundColor = '#e7f1ff'; // Resalta el seleccionado
-                    fila.style.display = 'table-row';
-                } else {
-                    // EN LUGAR DE OCULTAR, solo bajamos la opacidad para que sea ESTÁTICA
-                    fila.style.opacity = '0.5'; 
-                    fila.style.display = 'table-row'; // Forzamos que se siga viendo
-                }
-            });
-        }
-    });
+            if (seleccionado && seleccionado !== 'Todos') {
+                const filasRecaudo = document.querySelectorAll('#tabla-recaudo-analistas tbody tr'); 
+                
+                filasRecaudo.forEach(fila => {
+                    // Buscamos el texto dentro del span del analista
+                    const celdaAnalista = fila.querySelector('.fw-medium');
+                    if (celdaAnalista) {
+                        const nombreAnalista = celdaAnalista.innerText.trim();
+                        if (nombreAnalista === seleccionado) {
+                            fila.style.backgroundColor = '#f8fbff'; 
+                            fila.style.opacity = '1';
+                        } else {
+                            fila.style.opacity = '0.4'; 
+                        }
+                    }
+                });
+            }
+        });
+    
+    
 </script>
 {% endblock %}

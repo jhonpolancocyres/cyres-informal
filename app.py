@@ -350,6 +350,46 @@ def index():
                         'presupuesto_acc': df_final['Presupuesto_Acc'].tolist(),
                         'ingresos_acc': df_final['Ingreso_Acc'].tolist()
                     }
+                    # --- CÁLCULO DE CURVA DE RECUPERACIÓN (MEJORADO) ---
+                    curva_rec_data = {'labels': [], 'vencido': [], 'recuperado': [], 'porcentajes': [], 'efectividad_mensual': 0}
+                    try:
+                        if not df_filtrado.empty:
+                            df_curva = df_filtrado.copy()
+                            # Agrupamos por día
+                            rec_diaria = df_curva.groupby(df_curva['Fecha_Vencimiento'].dt.date).agg(
+                                Total_Vencido=('TOTAL CARTERA', 'sum'),
+                                Total_Recuperado=('TOTAL CARTERA', lambda x: df_curva.loc[x.index, 'ESTADO'].astype(str).str.strip().str.upper().eq('RECUPERADA').multiply(df_curva.loc[x.index, 'TOTAL CARTERA']).sum())
+                            ).reset_index()
+
+                            rec_diaria.columns = ['Fecha_Vence', 'Vencido', 'Recuperado']
+                            rec_diaria = rec_diaria.sort_values('Fecha_Vence')
+                            
+                            # Cálculo del % diario
+                            rec_diaria['Porc'] = (rec_diaria['Recuperado'] / rec_diaria['Vencido'] * 100).round(1).fillna(0)
+                            
+                            # CÁLCULO GLOBAL MENSUAL
+                            vencido_total = int(rec_diaria['Vencido'].sum())
+                            recuperado_total = int(rec_diaria['Recuperado'].sum())
+                            variacion_total = recuperado_total - vencido_total
+                            efectividad_global = (recuperado_total / vencido_total * 100) if vencido_total > 0 else 0
+
+                            curva_rec_data = {
+                                'labels': [d.strftime('%d-%m') for d in rec_diaria['Fecha_Vence']],
+                                'vencido': rec_diaria['Vencido'].tolist(),
+                                'recuperado': rec_diaria['Recuperado'].tolist(),
+                                'porcentajes': rec_diaria['Porc'].tolist(),
+                                'vencido_total': vencido_total,
+                                'recuperado_total': recuperado_total,
+                                'variacion_total': variacion_total,
+                                'efectividad_mensual': round(float(efectividad_global), 1)
+                            }
+
+                    except Exception as e:
+                        print(f"Error en curva: {e}")
+                    
+                    # Finalmente lo pasamos a los KPIs que recibe el HTML
+                                      
+                    kpis_calculados['curva_recuperacion'] = curva_rec_data
 
                     # --- NUEVO: DICCIONARIO DE INGRESOS DIARIOS POR CLIENTE ---
                     if 'COD. CLIENTE' in df_pagos.columns:
@@ -548,7 +588,7 @@ from procesador_gestion import calcular_gestion
 def gestiones():
     ahora_real = datetime.now()
     
-    # 1. CAPTURAR VARIABLES DE LA URL
+    # 1. CAPTURAR VARIABLES
     mes_actual = int(request.args.get('mes', ahora_real.month))
     anio_actual = int(request.args.get('anio', ahora_real.year))
     vista_activa = request.args.get('vista', 'general') 
@@ -556,34 +596,74 @@ def gestiones():
     f_inicio = request.args.get('fecha_inicio') 
     f_fin = request.args.get('fecha_fin')
 
-    # 2. DEFINIR RUTAS DINÁMICAS (Aquí añadimos los pagos)
+    # 2. DEFINIR RUTAS DINÁMICAS
     if mes_actual == ahora_real.month and anio_actual == ahora_real.year:
         path_cartera = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv') 
         path_gestion = os.path.join(BASE_DIR, 'data', 'gestion.zip')
-        path_pagos = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.csv') # <-- NEW: Mes actual
+        path_pagos = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.csv')
     else:
-        # Meses pasados: busca en la carpeta 'historico'
         path_cartera = os.path.join(BASE_DIR, 'data', 'historico', f'Proyectadoconsolidado_{anio_actual}_{mes_actual:02d}.csv')
         path_gestion = os.path.join(BASE_DIR, 'data', 'historico', f'gestion_{anio_actual}_{mes_actual:02d}.zip')
-        # ESTA ES LA LÍNEA QUE FALTA PARA QUE ENERO TRAIGA RECAUDO:
         path_pagos = os.path.join(BASE_DIR, 'data', 'historico', f'PagosConsolidado_{anio_actual}_{mes_actual:02d}.csv')
 
-    # 3. LLAMAR AL PROCESADOR
+    # 3. INICIALIZAR VARIABLES PARA EVITAR ERRORES
+    indicadores = {}
+    pagos_analista_metodo = {}
+    metodos_fijos = ['WALLET', 'TRANSFERENCIA', 'CONSIGNACIÓN']
+
+    # 4. LLAMAR AL PROCESADOR Y CALCULAR PAGOS
     try:
+        # Procesador principal
         indicadores = calcular_gestion(
             path_cartera, 
             path_gestion,
-            ruta_pagos=path_pagos, # <-- NEW: Le pasamos la ruta al procesador
+            ruta_pagos=path_pagos,
             analista_seleccionado=analista_f,
             fecha_inicio=f_inicio, 
             fecha_fin=f_fin,
             mes_actual=mes_actual,
             anio_actual=anio_actual
         )
-    except Exception as e:
-        print(f"Error en procesador: {e}")
-        indicadores = {} 
 
+        # Lógica de Pagos por Analista (Usando path_pagos definido arriba)
+        if os.path.exists(path_pagos):
+            df_p = pd.read_csv(path_pagos, encoding='latin1', sep=None, engine='python')
+            df_p.columns = [c.upper().strip() for c in df_p.columns]
+            
+            col_v, col_m, col_a = 'VALOR PAGADO', 'MÉTODO DE PAGO', 'ANALISTA'
+
+            if all(c in df_p.columns for c in [col_v, col_m, col_a]):
+                df_p[col_v] = pd.to_numeric(df_p[col_v], errors='coerce').fillna(0)
+                df_p[col_m] = df_p[col_m].astype(str).str.upper().str.strip()
+                df_p[col_a] = df_p[col_a].astype(str).str.strip()
+
+                # Quitamos tildes para agrupar bien
+                df_p[col_m] = df_p[col_m].str.replace('Ó', 'O').str.replace('Á', 'A')
+
+                resumen = df_p.groupby([col_a, col_m])[col_v].sum().reset_index()
+
+                for _, row in resumen.iterrows():
+                    ana = row[col_a]
+                    met = row[col_m]
+                    val = row[col_v]
+
+                    nombre_final = None
+                    if 'WALLET' in met: nombre_final = 'WALLET'
+                    elif 'TRANSFERENCIA' in met: nombre_final = 'TRANSFERENCIA'
+                    elif 'CONSIGNACION' in met or 'CONSIGNACIÓN' in met: nombre_final = 'CONSIGNACIÓN'
+
+                    if nombre_final:
+                        if ana not in pagos_analista_metodo:
+                            pagos_analista_metodo[ana] = {m: 0 for m in metodos_fijos}
+                            pagos_analista_metodo[ana]['TOTAL'] = 0
+                        
+                        pagos_analista_metodo[ana][nombre_final] += val
+                        pagos_analista_metodo[ana]['TOTAL'] += val
+
+    except Exception as e:
+        print(f"Error general en ruta gestiones: {e}")
+
+    # 5. RETORNO (Corregido: las variables deben tener nombre=valor)
     return render_template('gestiones.html',
                            stats=indicadores,
                            vista_actual='gestiones',
@@ -591,7 +671,259 @@ def gestiones():
                            analista_actual=analista_f,
                            mes_actual=mes_actual,
                            anio_actual=anio_actual,
+                           pagos_analista_metodo=pagos_analista_metodo,
+                           metodos_fijos=metodos_fijos,
                            now=ahora_real)
+
+
+@app.route('/historicos')
+def historicos():
+
+    meses_es = {
+        'Jan': 'Ene', 'Feb': 'Feb', 'Mar': 'Mar', 'Apr': 'Abr', 
+        'May': 'May', 'Jun': 'Jun', 'Jul': 'Jul', 'Aug': 'Ago', 
+        'Sep': 'Sep', 'Oct': 'Oct', 'Nov': 'Nov', 'Dec': 'Dic'
+    }
+    # 1. DATOS FRÍOS (Jul-Dic 2025)
+    datos_finales = {
+        datetime(2025, 7, 1): 3416,
+        datetime(2025, 8, 1): 2998,
+        datetime(2025, 9, 1): 3137,
+        datetime(2025, 10, 1): 2911,
+        datetime(2025, 11, 1): 2379,
+        datetime(2025, 12, 1): 3025
+    }
+
+    # 2. RECOLECTOR DE PAGOS (2026+)
+    # Buscamos en la carpeta historico y el archivo vivo actual
+    ruta_patron_hist = os.path.join(BASE_DIR, 'data', 'historico', 'PagosConsolidado_*.csv')
+    archivos_a_procesar = glob.glob(ruta_patron_hist)
+    archivos_a_procesar.append(RUTA_PAGOS) 
+
+    for ruta in archivos_a_procesar:
+        try:
+            if os.path.exists(ruta):
+                # Usamos sep=None y engine='python' para detectar si es coma o punto y coma
+                df_p = pd.read_csv(ruta, encoding='latin1', sep=None, engine='python')
+                
+                if 'FECHA PAGO' in df_p.columns and 'VALOR PAGADO' in df_p.columns:
+                    # FORZAMOS EL FORMATO: dayfirst=True para que 01/02 sea 1 de Feb
+                    df_p['FECHA PAGO'] = pd.to_datetime(df_p['FECHA PAGO'], dayfirst=True, errors='coerce')
+                    
+                    # Limpiamos filas sin fecha o sin valor
+                    df_p = df_p.dropna(subset=['FECHA PAGO', 'VALOR PAGADO'])
+                    
+                    # FILTRO DE SEGURIDAD: Solo años 2026 en adelante para esta parte
+                    df_p = df_p[df_p['FECHA PAGO'].dt.year >= 2026]
+
+                    # Agrupamos por Mes y Año
+                    df_p['MES_KEY'] = df_p['FECHA PAGO'].dt.to_period('M')
+                    resumen = df_p.groupby('MES_KEY')['VALOR PAGADO'].sum().reset_index()
+
+                    for _, row in resumen.iterrows():
+                        fecha_dt = row['MES_KEY'].to_timestamp()
+                        valor_m = round(row['VALOR PAGADO'] / 1000000, 0)
+                        
+                        # Guardar o sumar si ya existe
+                        if fecha_dt in datos_finales:
+                            datos_finales[fecha_dt] += int(valor_m)
+                        else:
+                            datos_finales[fecha_dt] = int(valor_m)
+        except Exception as e:
+            print(f"Error procesando {ruta}: {e}")
+
+    # --- INICIO LÓGICA GRÁFICA 2: MORA (VERSIÓN CORREGIDA) ---
+    mora_valor_final = {
+        datetime(2025, 7, 1): 763, datetime(2025, 8, 1): 830,
+        datetime(2025, 9, 1): 673, datetime(2025, 10, 1): 597,
+        datetime(2025, 11, 1): 764, datetime(2025, 12, 1): 391
+    }
+    
+    mora_porcentaje_final = {
+        datetime(2025, 7, 1): 46.8, datetime(2025, 8, 1): 51.40,
+        datetime(2025, 9, 1): 44.17, datetime(2025, 10, 1): 37.98,
+        datetime(2025, 11, 1): 49.30, datetime(2025, 12, 1): 30.90
+    }
+
+    # --- LÓGICA GRÁFICA 2: INDICADOR DE MORA (FOTO DE HOY) ---
+    try:
+        # 1. Definimos los archivos a leer (El consolidado actual y los de meses pasados si existen)
+        # Esto es para que la gráfica tenga historia: Ene, Feb...
+        rutas_mora = glob.glob(os.path.join(BASE_DIR, 'data', 'historico', 'Proyectadoconsolidado_*.csv'))
+        rutas_mora.append(RUTA_CARTERA) 
+
+        for ruta in rutas_mora:
+            if os.path.exists(ruta):
+                df_m = pd.read_csv(ruta, encoding='latin1', sep=';')
+                df_m.columns = [str(c).strip() for c in df_m.columns]
+
+                # Convertimos a números
+                df_m['DIAS_MORA'] = pd.to_numeric(df_m['DIAS_MORA'], errors='coerce').fillna(0)
+                df_m['TOTAL CARTERA'] = pd.to_numeric(df_m['TOTAL CARTERA'], errors='coerce').fillna(0)
+
+                # --- NUEVA LÓGICA DE FILTROS ---
+                # 1. Todo lo que te deben (Denominador)
+                mask_todo_pendiente = (df_m['ESTADO'].str.strip() == 'PENDIENTE')
+                suma_cartera_pendiente = df_m.loc[mask_todo_pendiente, 'TOTAL CARTERA'].sum()
+
+                # 2. Lo que está en mora (Numerador)
+                mask_mora_real = mask_todo_pendiente & (df_m['DIAS_MORA'] >= 1)
+                suma_mora_vencida = df_m.loc[mask_mora_real, 'TOTAL CARTERA'].sum()
+
+                # Identificar mes de la foto
+                df_m['PRIMERA_APARICION'] = pd.to_datetime(df_m['PRIMERA_APARICION'], errors='coerce')
+                fecha_foto = df_m['PRIMERA_APARICION'].dropna().iloc[0] 
+                fecha_mes = datetime(fecha_foto.year, fecha_foto.month, 1)
+
+                # Guardar resultados
+                mora_valor_final[fecha_mes] = int(round(suma_mora_vencida / 1000000, 0))
+                
+                if suma_cartera_pendiente > 0:
+                    mora_porcentaje_final[fecha_mes] = round((suma_mora_vencida / suma_cartera_pendiente) * 100, 1)
+                
+                    
+    except Exception as e:
+        print(f"Error crítico en mora: {str(e)}")
+
+    # Preparar listas para la Gráfica 2 (Usando el mismo orden de meses)
+    labels_mora = []
+    data_mora_val = []
+    data_mora_pct = []
+    fechas_mora_ord = sorted(mora_valor_final.keys())
+
+    for f_m in fechas_mora_ord:
+        lbl_en = f_m.strftime('%b-%y')
+        m_en_m = lbl_en.split('-')[0]
+        a_en_m = lbl_en.split('-')[1]
+        labels_mora.append(f"{meses_es.get(m_en_m, m_en_m)}-{a_en_m}")
+        data_mora_val.append(mora_valor_final[f_m])
+        data_mora_pct.append(mora_porcentaje_final[f_m])
+    # --- FIN LÓGICA GRÁFICA 2 ---
+
+    # 3. ORDENAR Y PREPARAR COLORES
+    fechas_ordenadas = sorted(datos_finales.keys())
+    
+    # Obtenemos el mes y año actual para comparar
+    ahora = datetime.now()
+    mes_actual_str = ahora.strftime('%b-%y')
+
+    labels_recaudo = []
+    data_recaudo = []
+    colores_barras = []
+
+    for f in fechas_ordenadas:
+        # Generamos el nombre en inglés primero
+        label_en = f.strftime('%b-%y') # Ej: 'Feb-26'
+        
+        # Traducimos la parte del mes
+        mes_en = label_en.split('-')[0]
+        anio_part = label_en.split('-')[1]
+        label_es = f"{meses_es.get(mes_en, mes_en)}-{anio_part}"
+        
+        labels_recaudo.append(label_es)
+        data_recaudo.append(datos_finales[f])
+        
+        # Color: Naranja si es el mes actual, Verde si es pasado
+        ahora = datetime.now()
+        if f.month == ahora.month and f.year == ahora.year:
+            colores_barras.append('rgba(245, 174, 39, 0.8)')
+        else:
+            colores_barras.append('rgba(16, 185, 129, 0.6)')
+
+    # --- GRÁFICA 3: % PARTICIPACIÓN POR MÉTODO DE PAGO ---
+    metodos_fijos = ['WALLET', 'TRANSFERENCIA', 'CONSIGNACIÓN']
+    
+    # 1. Datos estáticos Jul-Dic 2025
+    metodos_pct = {
+        'WALLET': {
+            datetime(2025, 7, 1): 33.16, datetime(2025, 8, 1): 28.58, datetime(2025, 9, 1): 32.39,
+            datetime(2025, 10, 1): 34.31, datetime(2025, 11, 1): 38.47, datetime(2025, 12, 1): 38.07
+        },
+        'TRANSFERENCIA': {
+            datetime(2025, 7, 1): 3.31, datetime(2025, 8, 1): 1.71, datetime(2025, 9, 1): 3.33,
+            datetime(2025, 10, 1): 4.60, datetime(2025, 11, 1): 5.23, datetime(2025, 12, 1): 5.03
+        },
+        'CONSIGNACIÓN': {
+            datetime(2025, 7, 1): 63.53, datetime(2025, 8, 1): 69.69, datetime(2025, 9, 1): 64.28,
+            datetime(2025, 10, 1): 61.10, datetime(2025, 11, 1): 56.29, datetime(2025, 12, 1): 56.90
+        }
+    }
+
+    # 2. Procesar archivos de pagos reales para 2026
+    for ruta in archivos_a_procesar:
+        try:
+            if os.path.exists(ruta):
+                df_met = pd.read_csv(ruta, encoding='latin1', sep=None, engine='python')
+                df_met.columns = [c.upper().strip() for c in df_met.columns]
+                
+                col_f, col_v, col_m = 'FECHA PAGO', 'VALOR PAGADO', 'MÉTODO DE PAGO'
+
+                if all(col in df_met.columns for col in [col_f, col_v, col_m]):
+                    df_met[col_f] = pd.to_datetime(df_met[col_f], dayfirst=True, errors='coerce')
+                    df_met = df_met[df_met[col_f].dt.year == 2026].copy()
+
+                    if not df_met.empty:
+                        df_met['MES_DT'] = df_met[col_f].dt.to_period('M').dt.to_timestamp()
+                        df_met[col_m] = df_met[col_m].astype(str).str.upper().str.strip()
+                        df_met[col_m] = df_met[col_m].str.replace('Ó', 'O').str.replace('Á', 'A')
+
+                        total_por_mes = df_met.groupby('MES_DT')[col_v].sum()
+                        agrupado = df_met.groupby(['MES_DT', col_m])[col_v].sum().reset_index()
+
+                        for _, row in agrupado.iterrows():
+                            m_fecha, m_nombre = row['MES_DT'], row[col_m]
+                            nombre_final = None
+                            if 'WALLET' in m_nombre: nombre_final = 'WALLET'
+                            elif 'TRANSFERENCIA' in m_nombre: nombre_final = 'TRANSFERENCIA'
+                            elif 'CONSIGNACION' in m_nombre or 'CONSIGNACIÓN' in m_nombre: nombre_final = 'CONSIGNACIÓN'
+
+                            if nombre_final:
+                                total_mes = total_por_mes[m_fecha]
+                                if total_mes > 0:
+                                    pct = round((row[col_v] / total_mes) * 100, 1)
+                                    metodos_pct[nombre_final][m_fecha] = pct
+        except Exception as e:
+            print(f"Error detectando métodos: {e}")
+
+    # 3. Generar Etiquetas de Tiempo (Jul 2025 a Feb 2026)
+    labels_linea_obj = sorted(list(set(f for m in metodos_pct.values() for f in m.keys())))
+    
+    # 4. Formatear Datasets finales
+    labels_linea_es = []
+    for f in labels_linea_obj:
+        mes_en = f.strftime('%b')
+        labels_linea_es.append(f"{meses_es.get(mes_en, mes_en)}-{f.strftime('%y')}")
+
+    datasets_linea = []
+    colores_map = {'WALLET': '#3B82F6', 'TRANSFERENCIA': '#10B981', 'CONSIGNACIÓN': '#F59E0B'}
+
+    for nombre_m in metodos_fijos:
+        puntos = [float(metodos_pct[nombre_m].get(f, 0)) for f in labels_linea_obj]
+        datasets_linea.append({
+            'label': nombre_m,
+            'data': puntos,
+            'borderColor': colores_map.get(nombre_m, '#94a3b8'),
+            'backgroundColor': colores_map.get(nombre_m, '#94a3b8'),
+            'borderWidth': 3,
+            'tension': 0.3,
+            'fill': False,
+            'pointRadius': 5
+        })
+
+    # --- RETURN FINAL (Sin duplicar variables) ---
+    return render_template('historicos.html',
+                           vista_actual='historicos',
+                           labels_recaudo=labels_recaudo,
+                           data_recaudo=data_recaudo,
+                           colores_recaudo=colores_barras,
+                           labels_mora=labels_mora,
+                           data_mora_val=data_mora_val,
+                           data_mora_pct=data_mora_pct,
+                           labels_linea_es=labels_linea_es,
+                           datasets_linea=datasets_linea,
+                           fecha_proyectado=obtener_fecha_archivo(RUTA_CARTERA),
+                           fecha_pagos=obtener_fecha_archivo(RUTA_PAGOS))
+
 
 if __name__ == '__main__':
     # Esto permite que Render asigne el puerto automáticamente

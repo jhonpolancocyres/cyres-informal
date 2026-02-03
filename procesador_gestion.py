@@ -215,6 +215,31 @@ def calcular_gestion(ruta_cartera, ruta_gestion, ruta_pagos=None, analista_selec
             ranking_dia_df = ranking_dia_df[ranking_dia_df[col_user] != 'Jhon Polanco']
             ranking_dia_final = ranking_dia_df.sort_values(by='porc_efec', ascending=False).to_dict(orient='records')
 
+        # --- LÓGICA DE CURVA DE RECUPERACIÓN (CIRUGÍA PRECISA) ---
+        curva_rec_data = {'labels': [], 'porcentajes': []}
+        try:
+            col_vence = 'Fecha_Vencimiento' # Nombre exacto de tu columna
+            # Creamos una copia temporal para no dañar las fechas originales del df_car
+            df_temp_rec = df_car.copy()
+            df_temp_rec[col_vence] = pd.to_datetime(df_temp_rec[col_vence], dayfirst=True, errors='coerce')
+            
+            # Agrupamos por día de vencimiento
+            rec_diaria = df_temp_rec.groupby(df_temp_rec[col_vence].dt.date).agg(
+                Total_Vencido=(col_sal, 'sum'),
+                Total_Recuperado=(col_sal, lambda x: df_temp_rec.loc[x.index, 'ESTADO'].str.strip().eq('RECUPERADA').multiply(df_temp_rec.loc[x.index, col_sal]).sum())
+            ).reset_index()
+
+            # Ordenar y calcular %
+            rec_diaria = rec_diaria.dropna(subset=[col_vence]).sort_values(col_vence)
+            rec_diaria['Porc_Rec'] = (rec_diaria['Total_Recuperado'] / rec_diaria['Total_Vencido'] * 100).round(1).fillna(0)
+            
+            curva_rec_data = {
+                'labels': rec_diaria[col_vence].apply(lambda x: x.strftime('%d-%m')).tolist(),
+                'porcentajes': rec_diaria['Porc_Rec'].tolist()
+            }
+        except Exception as e:
+            print(f"Error en curva de recuperación: {e}")
+
         # --- LÓGICA DE RECAUDO MODIFICADA ---
         recaudo_stats_final = {'labels': [], 'valores': [], 'ranking': []}
         try:
@@ -322,7 +347,8 @@ def calcular_gestion(ruta_cartera, ruta_gestion, ruta_pagos=None, analista_selec
                 'no_efectividad': df_timeline['No_Efec_P'].tolist()
             },
             'ranking_dia': ranking_dia_final,
-            'recaudo_stats': recaudo_stats_final
+            'recaudo_stats': recaudo_stats_final,
+            'curva_recuperacion': curva_rec_data
         }
 
     except Exception as e:

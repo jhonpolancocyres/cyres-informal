@@ -202,6 +202,38 @@
             </div>
         </div>
 
+        <div class="row g-2 mt-3"> 
+            <div class="col-12">
+                <div class="dashboard-card shadow-sm"> 
+                    <div class="card-body p-2"> 
+                        <h5 class="card-title mb-1 d-flex align-items-center flex-wrap" style="font-size: 0.9rem; font-weight: 600; color: #64748b;">
+                            <span class="me-auto">Curva de Recuperación Diaria</span>
+                            
+                            {% if kpis.curva_recuperacion %}
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-secondary-subtle text-secondary border">
+                                    Vencido: ${{ "{:,.0f}".format(kpis.curva_recuperacion.vencido_total or 0) }}
+                                </span>
+                                <span class="badge bg-success-subtle text-success border">
+                                    Recuperado: ${{ "{:,.0f}".format(kpis.curva_recuperacion.recuperado_total or 0) }}
+                                </span>
+                                <span class="badge {{ 'bg-danger-subtle text-danger' if (kpis.curva_recuperacion.variacion_total or 0) < 0 else 'bg-info-subtle text-info' }} border">
+                                    Var: ${{ "{:,.0f}".format(kpis.curva_recuperacion.variacion_total or 0) }}
+                                </span>
+                                <span class="badge {{ 'bg-success' if (kpis.curva_recuperacion.efectividad_mensual or 0) >= 90 else 'bg-warning text-dark' }}">
+                                    Efectividad: {{ kpis.curva_recuperacion.efectividad_mensual or 0 }}%
+                                </span>
+                            </div>
+                            {% endif %}
+                        </h5>
+                        <div style="position: relative; height: 250px; width: 100%;"> 
+                            <canvas id="chartCurvaRecuperacion"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <div class="row g-3 mt-1">
         <div class="col-12">
             <div class="dashboard-card shadow-sm">
@@ -436,6 +468,103 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (fMes) fMes.addEventListener('change', cambiarPeriodo);
     if (fAnio) fAnio.addEventListener('change', cambiarPeriodo);
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script>
+if (fMes) fMes.addEventListener('change', cambiarPeriodo);
+    if (fAnio) fAnio.addEventListener('change', cambiarPeriodo);
+
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cData = {{ (kpis.curva_recuperacion if kpis.curva_recuperacion else {}) | tojson | safe }};
+    const ctxCurva = document.getElementById('chartCurvaRecuperacion');
+    
+    if (ctxCurva && cData.labels && cData.labels.length > 0) {
+        new Chart(ctxCurva, {
+            type: 'line', 
+            data: {
+                labels: cData.labels,
+                datasets: [
+                    {
+                        label: 'Vencimientos del Día',
+                        data: cData.vencido,
+                        borderColor: '#94a3b8',    // GRIS
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,            // LÍNEA FIJA
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 4
+                    },
+                    {
+                        label: 'Total Recuperado',
+                        data: cData.recuperado,
+                        borderColor: '#10b981',    // VERDE
+                        borderDash: [5, 5],       // LÍNEA PUNTEADA
+                        borderWidth: 2,
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(context.parsed.y);
+                                }
+                                return label;
+                            },
+                            footer: function(tooltipItems) {
+                                // Buscamos los datos para el cálculo de variación y %
+                                const idx = tooltipItems[0].dataIndex;
+                                const vencido = cData.vencido[idx] || 0;
+                                const recuperado = cData.recuperado[idx] || 0;
+                                const porc = cData.porcentajes[idx] || 0;
+                                const variacion = recuperado - vencido;
+
+                                let textVariacion = 'Variación: ' + new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(variacion);
+                                
+                                return [
+                                    textVariacion,
+                                    'Efectividad: ' + porc + '%'
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 });
 
 </script>
