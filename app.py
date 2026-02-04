@@ -9,6 +9,7 @@ import pytz
 
 
 from procesador_maestro import procesar_todo  # Esto importa tu lógica de las 11 columnas
+from procesador_recuperacion import obtener_tabla_recuperacion_franjas
 
 app = Flask(__name__)
 
@@ -218,6 +219,7 @@ def procesar_informacion(tipo_vista, ciudad_filtro=None):
 
 @app.route('/')
 def index():
+    global RUTA_CARTERA, RUTA_PAGOS
     vista = request.args.get('vista', 'cyres')
     ciudad = request.args.get('ciudad', 'Todas')
 
@@ -233,9 +235,13 @@ def index():
     if mes_actual == mes_actual_real and anio_actual == anio_actual_real:
         path_proyectado = os.path.join(BASE_DIR, 'data', 'Proyectadoconsolidado.csv')
         path_pagos = os.path.join(BASE_DIR, 'data', 'PagosConsolidado.csv')
+        
     else:
         path_proyectado = os.path.join(BASE_DIR, 'data', 'historico', f'Proyectadoconsolidado_{anio_actual}_{mes_actual:02d}.csv')
         path_pagos = os.path.join(BASE_DIR, 'data', 'historico', f'PagosConsolidado_{anio_actual}_{mes_actual:02d}.csv')
+    global RUTA_CARTERA, RUTA_PAGOS
+    RUTA_CARTERA = path_proyectado
+    RUTA_PAGOS = path_pagos
 
     # Para que no te de error de "folder_data", definimos esta variable que usas más adelante
     folder_data = os.path.join(BASE_DIR, 'data')
@@ -456,24 +462,103 @@ def index():
         except Exception as e:
             print(f"Error en detalle: {e}")
 
-        return render_template('detalle.html', 
-                               kpis=kpis_calculados, 
-                               grafico_lineas=grafico_lineas, 
-                               detalle_clientes=detalle_clientes_grafica,
-                               detalle_presupuesto=detalle_presupuesto_grafica, 
-                               vista_actual=vista,
-                               operaciones_tabla=operaciones_tabla, 
-                               ciudad_actual=ciudad,
-                               mes_actual=mes_actual,
-                               anio_actual=anio_actual,
-                               fecha_proyectado=fecha_act_cartera, 
-                               fecha_pagos=fecha_act_pagos)
-    
+        try:
+            print(f"\n" + "="*40)
+            print(f"DEBUG: PROCESANDO RECUPERACIÓN: {path_proyectado}")
+            tabla_recu, total_recu = obtener_tabla_recuperacion_franjas(path_proyectado)
+            
+            # --- NUEVO: ESTO IMPRIMIRÁ EL DESGLOSE EN TU TERMINAL ---
+            print("DESGLOSE POR FRANJAS:")
+            for fila in tabla_recu:
+                # Añadimos el % al print de la terminal
+                print(f" - {fila['rango']:<20} : ${fila['valor']:>12,.0f} ({fila['porcentaje']}% )")
+            
+            print(f"TOTAL RECUPERADO: ${total_recu:>12,.0f}")
+            print("="*40 + "\n")
+            
+        except Exception as e:
+            print(f"ERROR EN EL PROCESADOR: {e}")
+            tabla_recu, total_recu = [], 0
 
-    # Justo antes de llamar a la vista general, actualizamos las rutas globales
-    global RUTA_CARTERA, RUTA_PAGOS
-    RUTA_CARTERA = path_proyectado
-    RUTA_PAGOS = path_pagos
+        # --- LÓGICA PARA COMPARATIVA DIARIA (Enero vs Febrero) ---
+        comparativa_diaria = {
+            'labels': list(range(1, 32)),  
+            'enero': [0.0]*31,
+            'febrero': [0.0]*31
+        }
+
+        try:
+            def procesar_csv_diario(ruta):
+                if not os.path.exists(ruta):
+                    print(f"DEBUG: No se encontró el archivo en {ruta}")
+                    return {}
+                
+                # Leer el archivo
+                df = pd.read_csv(ruta, sep=';', encoding='latin1')
+                df.columns = df.columns.str.strip() # Limpiar espacios en nombres de columnas
+                
+                # Convertir fecha usando el formato 02/02/2026 (día/mes/año)
+                # Usamos 'FECHA PAGO' que es el nombre real de tu columna
+                df['FECHA_DT'] = pd.to_datetime(df['FECHA PAGO'], format='%d/%m/%Y', errors='coerce')
+                
+                # Convertir 'VALOR PAGADO' a número
+                df['MONTO'] = pd.to_numeric(df['VALOR PAGADO'], errors='coerce').fillna(0)
+                
+                # Agrupar por día
+                return df.groupby(df['FECHA_DT'].dt.day)['MONTO'].sum().to_dict()
+
+            # 1. Procesar Febrero (Actual en \data)
+            recaudo_feb_dict = procesar_csv_diario(RUTA_PAGOS)
+            for dia, valor in recaudo_feb_dict.items():
+                if pd.notna(dia) and 1 <= int(dia) <= 31:
+                    comparativa_diaria['febrero'][int(dia)-1] = float(valor)
+
+            # 2. Procesar Enero (Histórico en \data\historico)
+            # Nota: Cambié a 'historico' (sin s) y el año 2026 como indicaste
+            path_enero = os.path.join(BASE_DIR, 'data', 'historico', 'PagosConsolidado_2026_01.csv')
+            recaudo_ene_dict = procesar_csv_diario(path_enero)
+            for dia, valor in recaudo_ene_dict.items():
+                if pd.notna(dia) and 1 <= int(dia) <= 31:
+                    comparativa_diaria['enero'][int(dia)-1] = float(valor)
+
+        except Exception as e:
+            print(f"Error procesando comparativa diaria: {e}")
+
+        # --- RUTAS Y TABLA (MANTENER IGUAL) ---
+        
+        RUTA_CARTERA = path_proyectado
+        RUTA_PAGOS = path_pagos
+        # --- DETERMINAR QUÉ ARCHIVO DE CARTERA (PROYECTADO) USAR ---
+        if mes_actual == 1:
+            # Si es Enero, buscamos en la carpeta historico (ajusta la ruta si es necesario)
+            path_proyectado_tabla = os.path.join(BASE_DIR, 'data', 'historico', 'Proyectadoconsolidado_2026_01.csv')
+        else:
+            # Si es el mes actual (Febrero), usamos el archivo de la carpeta data
+            path_proyectado_tabla = RUTA_CARTERA 
+    
+        # --- LLAMADA A LA TABLA CON EL ARCHIVO CORRECTO ---
+        try:
+            # Usamos path_proyectado porque ya contiene la ruta correcta (Enero, Febrero, etc.)
+            tabla_recu, total_recu = obtener_tabla_recuperacion_franjas(path_proyectado)
+        except Exception as e:
+            print(f"Error en tabla recu: {e}")
+            tabla_recu, total_recu = [], 0
+
+        return render_template('detalle.html', 
+                            kpis=kpis_calculados,
+                            grafico_lineas=grafico_lineas, 
+                            detalle_clientes=detalle_clientes_grafica,
+                            detalle_presupuesto=detalle_presupuesto_grafica, 
+                            vista_actual=vista,
+                            operaciones_tabla=operaciones_tabla, 
+                            ciudad_actual=ciudad,
+                            mes_actual=mes_actual,
+                            anio_actual=anio_actual,
+                            fecha_proyectado=fecha_act_cartera, 
+                            fecha_pagos=fecha_act_pagos,
+                            tabla_recu_franjas=tabla_recu,
+                            total_recu_monto_tabla=total_recu,
+                            comparativa_diaria=comparativa_diaria)
 
     datos = procesar_informacion(vista, ciudad)
     
@@ -785,11 +870,14 @@ def historicos():
     except Exception as e:
         print(f"Error crítico en mora: {str(e)}")
 
-    # Preparar listas para la Gráfica 2 (Usando el mismo orden de meses)
+    # Preparar listas para la Gráfica 2 (Mora)
     labels_mora = []
     data_mora_val = []
     data_mora_pct = []
+    colores_mora = []  # <--- Creamos esta lista
+
     fechas_mora_ord = sorted(mora_valor_final.keys())
+    ahora = datetime.now()
 
     for f_m in fechas_mora_ord:
         lbl_en = f_m.strftime('%b-%y')
@@ -798,7 +886,12 @@ def historicos():
         labels_mora.append(f"{meses_es.get(m_en_m, m_en_m)}-{a_en_m}")
         data_mora_val.append(mora_valor_final[f_m])
         data_mora_pct.append(mora_porcentaje_final[f_m])
-    # --- FIN LÓGICA GRÁFICA 2 ---
+
+        # Lógica de color: Naranja si es el mes actual, Verde si es pasado
+        if f_m.month == ahora.month and f_m.year == ahora.year:
+            colores_mora.append('rgba(245, 174, 39, 0.8)')  # Naranja
+        else:
+            colores_mora.append('rgba(16, 185, 129, 0.6)')  # Verde
 
     # 3. ORDENAR Y PREPARAR COLORES
     fechas_ordenadas = sorted(datos_finales.keys())
@@ -919,6 +1012,7 @@ def historicos():
                            labels_mora=labels_mora,
                            data_mora_val=data_mora_val,
                            data_mora_pct=data_mora_pct,
+                           colores_mora=colores_mora,
                            labels_linea_es=labels_linea_es,
                            datasets_linea=datasets_linea,
                            fecha_proyectado=obtener_fecha_archivo(RUTA_CARTERA),

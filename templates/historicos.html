@@ -103,8 +103,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     type: 'bar',
                     label: 'Valor en Mora',
                     data: {{ data_mora_val | tojson }},
-                    backgroundColor: 'rgba(239, 68, 68, 0.5)',
-                    borderColor: '#ef4444',
+                    // CAMBIO AQUÍ: Usamos los colores dinámicos
+                    backgroundColor: {{ colores_mora | tojson }}, 
+                    borderColor: {{ colores_mora | tojson }},
                     borderWidth: 1,
                     borderRadius: 5,
                     yAxisID: 'y',
@@ -112,7 +113,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         anchor: 'end',
                         align: 'top',
                         formatter: (val) => '$' + val.toLocaleString('es-CO'),
-                        color: '#ef4444',
+                        // CAMBIO AQUÍ: También el texto lo ponemos gris oscuro para que sea legible
+                        color: '#475569', 
                         font: { weight: 'bold', size: 12 }
                     }
                 },
@@ -132,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         align: 'bottom',
                         offset: 10,
                         formatter: (val) => val + '%',
-                        color: '#1e293b',
+                        color: '#CC3737',
                         font: { weight: 'bold', size: 12 }
                     }
                 }

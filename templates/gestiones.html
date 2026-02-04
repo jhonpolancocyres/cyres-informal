@@ -235,7 +235,7 @@
                                     <thead class="bg-light">
                                         <tr style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
                                             <th>Analista</th>
-                                            <th class="text-center">Gestiones</th>
+                                            <th class="text-center">Clientes</th>
                                             <th class="text-center">Efectividad</th>
                                             <th class="text-center">% Efec.</th>
                                         </tr>
@@ -350,68 +350,7 @@
                     </div>
                 </div>
                 
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center justify-content-between mb-4">
-                                    <h5 class="card-title fw-bold text-dark mb-0">
-                                        <i class="bi bi-cash-stack me-2 text-success"></i>Recaudo por Analista y Método
-                                    </h5>
-                                    <span class="badge bg-light text-dark border">
-                                        Periodo: {{ mes_actual }}/{{ anio_actual }}
-                                    </span>
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle border-top" id="tabla-recaudo-analistas">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th style="width: 30%;">Analista</th>
-                                                <th class="text-end">Wallet</th>
-                                                <th class="text-end">Transferencia</th>
-                                                <th class="text-end">Consignación</th>
-                                                <th class="text-end fw-bold bg-light">Total General</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% if pagos_analista_metodo %}
-                                                {% for analista, datos in pagos_analista_metodo.items() %}
-                                                    {# Mostramos todos si es 'Todos', o filtramos por el seleccionado #}
-                                                    {% if analista_actual == 'Todos' or analista_actual == analista %}
-                                                    <tr>
-                                                        <td>
-                                                            <div class="d-flex align-items-center">
-                                                                <div class="avatar-sm-text me-2" style="width:24px; height:24px; background:#e9ecef; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">
-                                                                    {{ analista[:1] }}
-                                                                </div>
-                                                                <span class="fw-medium">{{ analista }}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td class="text-end text-muted">$ {{ "{:,.0f}".format(datos.get('WALLET', 0)) }}</td>
-                                                        <td class="text-end text-muted">$ {{ "{:,.0f}".format(datos.get('TRANSFERENCIA', 0)) }}</td>
-                                                        <td class="text-end text-muted">$ {{ "{:,.0f}".format(datos.get('CONSIGNACIÓN', 0)) }}</td>
-                                                        <td class="text-end fw-bold text-primary bg-light">
-                                                            $ {{ "{:,.0f}".format(datos.get('TOTAL', 0)) }}
-                                                        </td>
-                                                    </tr>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            {% else %}
-                                                <tr>
-                                                    <td colspan="5" class="text-center py-4 text-muted">
-                                                        <i class="bi bi-info-circle me-2"></i>No hay datos de pagos procesados para este mes.
-                                                    </td>
-                                                </tr>
-                                            {% endif %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-    
+                    
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="table-container-custom bg-white p-4">

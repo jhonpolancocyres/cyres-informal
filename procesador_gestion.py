@@ -321,9 +321,11 @@ def calcular_gestion(ruta_cartera, ruta_gestion, ruta_pagos=None, analista_selec
                     'valores': df_time_rec['VALOR_PAGADO'].tolist(),
                     'ranking': rank_completo.to_dict(orient='records')
                 }
+               
+                
         except:
             pass # Mantiene el dict vacío inicial si falla algo
-
+                 
         return {
             'total_clientes': int(total_clientes), 
             'total_documentos': int(len(df_car)),
@@ -348,9 +350,12 @@ def calcular_gestion(ruta_cartera, ruta_gestion, ruta_pagos=None, analista_selec
             },
             'ranking_dia': ranking_dia_final,
             'recaudo_stats': recaudo_stats_final,
-            'curva_recuperacion': curva_rec_data
+            'curva_recuperacion': curva_rec_data,
+            
         }
-
+        
+        
     except Exception as e:
         print(f"Error crítico: {e}")
         return {'total_clientes': 0, 'recaudo_stats': {'labels': [], 'valores': [], 'ranking': []}}
+    
